@@ -110,8 +110,7 @@ func (a *App) startup(ctx context.Context) {
 // GetBootstrap returns the static catalogue and environment info for the UI.
 func (a *App) GetBootstrap() BootstrapView {
 	available, detail := a.secrets.Available()
-	// Offer only adapters included in this build. In particular, the mock
-	// adapter is registered only by wails dev, never by a packaged build.
+	// Offer only adapters included in this build.
 	providers := make([]domain.ProviderInfo, 0)
 	for _, provider := range domain.SupportedProviders() {
 		if _, err := a.registry.Get(provider.ID); err == nil {

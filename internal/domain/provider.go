@@ -19,8 +19,8 @@ const (
 	// documented interface.
 	ProviderMacOSVPN VPNProvider = "macosvpn"
 
-	// ProviderMock is a fully simulated client used for development and for
-	// demonstrating the connection state machine without vendor software.
+	// ProviderMock is retained only so older profiles and tests can still name
+	// the value. It is not offered in the UI and no adapter registers it.
 	ProviderMock VPNProvider = "mock"
 
 	// ProviderSSH marks a profile as an SSH tunnel rather than a vendor client.
@@ -90,7 +90,6 @@ func SupportedProviders() []ProviderInfo {
 		{ID: ProviderTailscale, DisplayName: "Tailscale", Vendor: "Tailscale", DefaultPort: 41641},
 		{ID: ProviderSurfshark, DisplayName: "Surfshark VPN", Vendor: "Surfshark", DefaultPort: 51820},
 		{ID: ProviderMacOSVPN, DisplayName: "macOS VPN (L2TP/IPsec, IKEv2)", Vendor: "Apple", DefaultPort: 500},
-		{ID: ProviderMock, DisplayName: "Mock VPN (development)", Vendor: "Biebie", DefaultPort: 443},
 	}
 	for i := range providers {
 		providers[i].RequiresEndpoint = providers[i].ID.RequiresEndpoint()
@@ -100,8 +99,14 @@ func SupportedProviders() []ProviderInfo {
 	return providers
 }
 
-// IsKnownProvider reports whether the value is part of the shipped catalogue.
+// IsKnownProvider reports whether the value is valid on a stored profile.
+//
+// Mock is kept for legacy records and tests but is not offered in
+// SupportedProviders.
 func IsKnownProvider(p VPNProvider) bool {
+	if p == ProviderMock {
+		return true
+	}
 	for _, info := range SupportedProviders() {
 		if info.ID == p {
 			return true

@@ -2,11 +2,6 @@
 
 package main
 
-import (
-	"tobiro/internal/vpn"
-	"tobiro/internal/vpn/mock"
-)
+import "tobiro/internal/vpn"
 
-func registerDevelopmentProviders(registry *vpn.Registry) {
-	registry.Register(mock.New())
-}
+func registerDevelopmentProviders(_ *vpn.Registry) {}

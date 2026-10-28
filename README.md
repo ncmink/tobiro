@@ -200,7 +200,6 @@ Tobiro launches the vendor GUI instead of inventing arguments.
 | Tailscale | yes | all | yes, documented CLI | yes | open native client |
 | Surfshark VPN | yes | macOS | no documented CLI | macOS | open native client |
 | macOS VPN (L2TP/IPsec, IKEv2) | yes | macOS | disconnect only, `scutil --nc` | macOS | open Network settings |
-| Mock (development) | yes | — | yes, incl. OTP | yes | — |
 
 "Pending verification" means a platform CLI was detected (`pulsesvc` /
 `pulselauncher.exe` on Linux and Windows for Ivanti, `fortivpn` on Linux for
@@ -541,21 +540,6 @@ go test ./...  # domain, credential identity, secret-leakage and flow tests
 
 Application data lives at the path shown in Settings — on macOS,
 `~/Library/Application Support/biebie-access/data.json`.
-
-### Trying the full flow without a VPN
-
-Run `wails dev` to enable the **Mock VPN (development)** provider. It is omitted
-from packaged builds, including `wails build -debug`, in both the connection
-form and Settings → VPN clients. Existing saved mock profiles are preserved,
-but their simulated adapter is available only in development.
-
-Create a connection with this provider, add an account
-with authentication set to **Username + Password + OTP**, and connect. The
-dashboard walks through `connecting → authenticating → waiting_for_otp →
-connected`, prompts for a code, and reports an assigned IP and duration.
-
-Two deliberate hooks make the failure paths easy to exercise: the username
-`fail` is rejected by the gateway, and the code `000000` is rejected as invalid.
 
 ### Checking an adapter against a real client
 
