@@ -34,11 +34,15 @@ export function GetNetworkDiagnosis(arg1:string):Promise<domain.NetworkDiagnosis
 
 export function ImportConnections():Promise<main.ImportResultView>;
 
+export function ImportSSHConfigHosts(arg1:string,arg2:Array<string>):Promise<main.ImportResultView>;
+
 export function ListConnections():Promise<Array<main.ConnectionView>>;
 
 export function ListGroups():Promise<Array<domain.GroupView>>;
 
 export function ListProviderStatus():Promise<Array<domain.ProviderStatusView>>;
+
+export function ListSSHConfigHosts():Promise<Array<main.SSHConfigHostView>>;
 
 export function ListVendorProfiles(arg1:string):Promise<Array<domain.VendorProfileOption>>;
 

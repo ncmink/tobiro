@@ -62,6 +62,10 @@ export function ImportConnections() {
   return window['go']['main']['App']['ImportConnections']();
 }
 
+export function ImportSSHConfigHosts(arg1, arg2) {
+  return window['go']['main']['App']['ImportSSHConfigHosts'](arg1, arg2);
+}
+
 export function ListConnections() {
   return window['go']['main']['App']['ListConnections']();
 }
@@ -72,6 +76,10 @@ export function ListGroups() {
 
 export function ListProviderStatus() {
   return window['go']['main']['App']['ListProviderStatus']();
+}
+
+export function ListSSHConfigHosts() {
+  return window['go']['main']['App']['ListSSHConfigHosts']();
 }
 
 export function ListVendorProfiles(arg1) {

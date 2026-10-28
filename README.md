@@ -112,6 +112,20 @@ how it connects, so `MoveConnection` works while the tunnel is up where
 `UpdateConnection` asks you to disconnect first. When the destination is out of
 sight the dashboard says where the card went rather than letting it vanish.
 
+### Import SSH tunnels from `~/.ssh/config`
+
+On a **VPN** card (not an SSH tunnel), the **⋯** menu offers **Import from SSH
+config…**. Tobiro reads your `~/.ssh/config`, lists each `Host` block, and lets
+you tick the entries to add as SSH tunnels that **require** that VPN and sit in
+its group. For each host it uses `HostName` (or the alias when omitted), `User`,
+`Port` (default 22), `IdentityFile`, and `LocalForward` lines. Host patterns
+with `*`, `?`, or `!` are skipped, as is `Host *`. Other keywords are ignored;
+`Include` is followed (paths relative to the including file, with glob expansion).
+`Match` is not followed. If a tunnel name already
+exists in Tobiro, that row is disabled and re-import skips it. Key paths become
+`ssh_key` credentials; hosts without a key get a password credential with no
+secret stored until you connect.
+
 ---
 
 ## Password security

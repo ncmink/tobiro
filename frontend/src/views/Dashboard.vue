@@ -11,6 +11,7 @@ import ContextMenu from '@/components/ContextMenu.vue'
 import DeleteConnectionDialog from '@/components/DeleteConnectionDialog.vue'
 import DisconnectChainDialog from '@/components/DisconnectChainDialog.vue'
 import OpenKubeDialog from '@/components/OpenKubeDialog.vue'
+import SshConfigImportDialog from '@/components/SshConfigImportDialog.vue'
 import type { ContextMenuItem } from '@/lib/menu'
 import { useConnectionSharing } from '@/lib/connectionSharing'
 import { connectionId, connectionParentId, descendants, findNode, forest } from '@/lib/chain'
@@ -51,6 +52,7 @@ const moved = ref('')
 const pendingDisconnect = ref<main.ConnectionView | null>(null)
 const pendingDelete = ref<main.ConnectionView | null>(null)
 const openKubeTarget = ref<main.ConnectionView | null>(null)
+const sshConfigTarget = ref<main.ConnectionView | null>(null)
 
 const filtered = computed(() => {
   const query = search.value.trim().toLowerCase()
@@ -236,6 +238,9 @@ const menuItems = computed<ContextMenuItem[]>(() => {
 
   items.push({ id: 'details', label: 'Open details', divider: items.length > 0 })
   items.push({ id: 'edit', label: 'Edit connection…' })
+  if (target.profile.kind !== 'ssh') {
+    items.push({ id: 'ssh-config', label: 'Import from SSH config…' })
+  }
 
   // Filing a connection elsewhere is a one-click job here rather than a trip
   // through the edit form. Every group is a destination except the one the
@@ -302,6 +307,9 @@ function runMenuAction(id: string) {
       break
     case 'edit':
       editTarget.value = target
+      break
+    case 'ssh-config':
+      sshConfigTarget.value = target
       break
     case 'group':
       void setGroupHidden(target.profile.group, !target.hidden)
@@ -739,6 +747,13 @@ async function confirmFill(credentialId: string) {
       v-if="openKubeTarget"
       :connection="openKubeTarget"
       @close="openKubeTarget = null"
+      @done="(text) => (moved = text)"
+    />
+
+    <SshConfigImportDialog
+      v-if="sshConfigTarget"
+      :parent="sshConfigTarget"
+      @close="sshConfigTarget = null"
       @done="(text) => (moved = text)"
     />
   </div>

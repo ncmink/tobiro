@@ -866,6 +866,29 @@ export namespace main {
 	        this.launched = source["launched"];
 	    }
 	}
+	
+	export class SSHConfigHostView {
+	    alias: string;
+	    hostName: string;
+	    user: string;
+	    port: number;
+	    forwardCount: number;
+	    exists: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SSHConfigHostView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.alias = source["alias"];
+	        this.hostName = source["hostName"];
+	        this.user = source["user"];
+	        this.port = source["port"];
+	        this.forwardCount = source["forwardCount"];
+	        this.exists = source["exists"];
+	    }
+	}
 
 }
 

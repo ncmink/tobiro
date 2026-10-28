@@ -9,6 +9,7 @@ import {
   ExportConnections,
   GetBootstrap,
   ImportConnections,
+  ImportSSHConfigHosts,
   ListConnections,
   ListGroups,
   ListProviderStatus,
@@ -215,6 +216,12 @@ export const useConnectionsStore = defineStore('connections', () => {
     return result
   }
 
+  async function importSshConfigFromHosts(parentId: string, aliases: string[]) {
+    const result = await ImportSSHConfigHosts(parentId, aliases)
+    if (result.connections > 0) await refresh()
+    return result
+  }
+
   function applySession(session: {
     profileId: string
     state: string
@@ -277,6 +284,7 @@ export const useConnectionsStore = defineStore('connections', () => {
     networkDiagnosis,
     exportToFile,
     importFromFile,
+    importSshConfigFromHosts,
     applySession,
   }
 })

@@ -147,3 +147,13 @@ type ImportResultView struct {
 	Skipped     []string `json:"skipped"`
 	Cancelled   bool     `json:"cancelled"`
 }
+
+// SSHConfigHostView is one Host block from the user's OpenSSH config file.
+type SSHConfigHostView struct {
+	Alias        string `json:"alias"`
+	HostName     string `json:"hostName"`
+	User         string `json:"user"`
+	Port         int    `json:"port"`
+	ForwardCount int    `json:"forwardCount"`
+	Exists       bool   `json:"exists"`
+}
