@@ -83,10 +83,9 @@ func (p VPNProfile) IsSSH() bool { return p.AccessKind() == KindSSH }
 // ReadyToConnect reports what is still missing before this connection can be
 // raised, or nil when nothing is.
 //
-// A tunnel is created before it is configured — the server and the port map are
-// filled in on the connection's own page — so an unfinished one is expected
-// rather than exceptional, and saying which part is missing is more use than
-// letting the dial fail against an empty address.
+// A tunnel is created before it is configured — the server and login are filled
+// in on the connection's own page — and port forwards are optional at connect
+// time (a session with no -L still reaches the server).
 func (p VPNProfile) ReadyToConnect() error {
 	if !p.IsSSH() {
 		return nil

@@ -139,8 +139,7 @@ func validatePort(label string, port int) error {
 	return nil
 }
 
-// ValidateForwards checks a whole forward list for a tunnel that is about to be
-// raised, which is the only moment an empty list is wrong.
+// ValidateForwards checks every forward in a list that must be non-empty.
 func ValidateForwards(forwards []PortForward) error {
 	if len(forwards) == 0 {
 		return errors.New("an SSH tunnel needs at least one port to forward")
@@ -185,7 +184,7 @@ func (s SSHSettings) Validate() error {
 	if err := validateSSHUser(user); err != nil {
 		return err
 	}
-	return ValidateForwards(s.Forwards)
+	return validateForwardShapes(s.Forwards)
 }
 
 // ValidateDraft checks only what has been filled in so far.

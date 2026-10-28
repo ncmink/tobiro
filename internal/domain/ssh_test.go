@@ -135,18 +135,23 @@ func TestAnUnfinishedTunnelSaysWhatItIsMissing(t *testing.T) {
 			wantErr: "login name",
 		},
 		{
-			name: "a login but no ports",
+			name: "a login with no ports yet",
 			profile: VPNProfile{
 				Kind: KindSSH, Host: "172.16.20.65", Port: 22,
 				SSH: SSHSettings{User: "server1"},
 			},
-			wantErr: "at least one port",
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.profile.ReadyToConnect()
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("expected ready to connect: %v", err)
+				}
+				return
+			}
 			if err == nil {
 				t.Fatal("expected an unfinished tunnel to refuse to connect")
 			}

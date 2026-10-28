@@ -485,9 +485,9 @@ func (a *App) requirementOf(p domain.VPNProfile) *RequirementView {
 // disconnecting always work and there is no vendor window to fall back to.
 //
 // What can differ is whether the tunnel has been set up yet. One that is still
-// missing its server or its ports reports that it cannot connect, and says
-// which part is missing, so the dashboard offers the reason in place of a
-// button that could only fail.
+// missing its server or login reports that it cannot connect, and says which
+// part is missing, so the dashboard offers the reason in place of a button
+// that could only fail. Port forwards are optional — connect still opens SSH.
 func sshCapabilities(profile domain.VPNProfile) domain.Capabilities {
 	capabilities := domain.Capabilities{
 		Installed:        true,

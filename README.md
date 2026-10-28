@@ -106,7 +106,7 @@ drop a connection you are not working with, without inventing a name for it
 first. Because hidden is its default, revealing it is what gets recorded, and it
 keeps that choice after its last connection moves out.
 
-Right-click any card to move a connection between groups, the archive included.
+Use the **⋯** menu on any card to move a connection between groups, the archive included.
 Moving is deliberately not an edit: it changes where a connection is listed, not
 how it connects, so `MoveConnection` works while the tunnel is up where
 `UpdateConnection` asks you to disconnect first. When the destination is out of

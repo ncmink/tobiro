@@ -98,12 +98,16 @@ func TestAHalfConfiguredTunnelSaves(t *testing.T) {
 	svc, _ := newService(t)
 	created := tunnel(t, svc, "SMOI bastion", "")
 
-	// Typing the server today and the ports tomorrow is an ordinary way to work.
-	saved, err := svc.SetTunnel(created.ID, domain.TunnelInput{Host: "172.16.20.65", Port: 22})
+	// Server and login are enough to connect; forwards can be added later.
+	saved, err := svc.SetTunnel(created.ID, domain.TunnelInput{
+		Host: "172.16.20.65",
+		Port: 22,
+		SSH:  domain.SSHSettings{User: "server1"},
+	})
 	if err != nil {
 		t.Fatalf("set tunnel: %v", err)
 	}
-	if saved.ReadyToConnect() == nil {
-		t.Fatal("expected a tunnel with no ports to refuse to connect")
+	if err := saved.ReadyToConnect(); err != nil {
+		t.Fatalf("expected a tunnel without forwards to be ready: %v", err)
 	}
 }

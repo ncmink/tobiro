@@ -206,8 +206,8 @@ function openMenu(connection: main.ConnectionView, event: MouseEvent) {
 }
 
 /**
- * The right-click menu offers what the card offers, plus the actions that
- * otherwise need a trip to the connection page.
+ * The ⋯ menu offers what the card offers, plus the actions that otherwise
+ * need a trip to the connection page.
  */
 const menuItems = computed<ContextMenuItem[]>(() => {
   const target = menu.value?.connection

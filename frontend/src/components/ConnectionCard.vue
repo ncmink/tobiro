@@ -155,7 +155,6 @@ function openMenu(event: MouseEvent) {
       nested ? 'connection-card--nested' : 'connection-card--root',
       { 'connection-card--connected': state === 'connected', 'connection-card--hidden': connection.hidden },
     ]"
-    @contextmenu.prevent="emit('menu', connection, $event)"
   >
     <div class="connection-row" :class="{ 'connection-row--iconless': isSSH }">
       <ProviderIcon
