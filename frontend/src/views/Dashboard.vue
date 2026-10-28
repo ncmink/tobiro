@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 
 import type { domain, main } from '@bindings/go/models'
+import logo from '@/assets/images/app-logo.png'
 import ConnectDialog from '@/components/ConnectDialog.vue'
 import ConnectionCard from '@/components/ConnectionCard.vue'
 import ConnectionForm from '@/components/ConnectionForm.vue'
@@ -11,6 +12,7 @@ import DeleteConnectionDialog from '@/components/DeleteConnectionDialog.vue'
 import DisconnectChainDialog from '@/components/DisconnectChainDialog.vue'
 import OpenKubeDialog from '@/components/OpenKubeDialog.vue'
 import type { ContextMenuItem } from '@/lib/menu'
+import { useConnectionSharing } from '@/lib/connectionSharing'
 import { connectionId, connectionParentId, descendants, findNode, forest } from '@/lib/chain'
 import { accountToConnectWith, canConnect, errorMessage, isActive } from '@/lib/state'
 import { useConnectionsStore } from '@/stores/connections'
@@ -19,6 +21,7 @@ import { useSessionsStore } from '@/stores/sessions'
 const router = useRouter()
 const store = useConnectionsStore()
 const sessions = useSessionsStore()
+const { sharing, exportConnections, importConnections } = useConnectionSharing()
 
 const search = ref('')
 const kindFilter = ref<'all' | 'vpn' | 'ssh'>('all')
@@ -382,32 +385,87 @@ async function confirmFill(credentialId: string) {
 
 <template>
   <div class="dashboard mx-auto w-full max-w-6xl space-y-6">
-    <header class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p class="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-brand">Your workspace</p>
-        <h1 class="text-[28px] font-semibold tracking-tight text-ink">Connections</h1>
-        <p class="mt-1.5 text-sm text-ink-muted">Your networks and tunnels, in one place.</p>
-        <p class="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-          {{ store.visibleConnections.length }}
-          {{ store.visibleConnections.length === 1 ? 'connection' : 'connections' }}
-          &middot;
-          <span :class="connectedCount ? 'text-ok' : ''">{{ connectedCount }} connected</span>
-          <template v-if="store.hiddenCount && !store.showHidden">
+    <header class="flex flex-wrap items-center justify-between gap-4">
+      <RouterLink
+        :to="{ name: 'dashboard' }"
+        class="no-drag flex min-w-0 items-center gap-4 rounded-xl transition hover:opacity-90"
+      >
+        <img :src="logo" alt="" class="h-28 w-28 shrink-0 object-contain sm:h-32 sm:w-32" />
+        <div class="min-w-0 leading-tight">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand">Your workspace</p>
+          <h1 class="text-[28px] font-semibold tracking-tight text-ink">Connections</h1>
+          <p class="mt-1 text-sm text-ink-muted">VPNs, SSH tunnels, one workspace.</p>
+          <p class="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+            {{ store.visibleConnections.length }}
+            {{ store.visibleConnections.length === 1 ? 'connection' : 'connections' }}
             &middot;
-            <span class="text-ink-faint">{{ store.hiddenCount }} hidden</span>
-          </template>
-        </p>
-      </div>
+            <span :class="connectedCount ? 'text-ok' : ''">{{ connectedCount }} connected</span>
+            <template v-if="store.hiddenCount && !store.showHidden">
+              &middot;
+              <span class="text-ink-faint">{{ store.hiddenCount }} hidden</span>
+            </template>
+            <span class="text-ink-faint">&middot; v{{ store.bootstrap?.version ?? '—' }}</span>
+          </p>
+        </div>
+      </RouterLink>
 
       <div class="flex max-w-full flex-wrap items-center gap-2">
+        <span
+          v-if="sessions.anyConnected"
+          class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-ok/10 px-3 text-xs font-medium text-ok"
+        >
+          <span class="h-1.5 w-1.5 rounded-full bg-ok" />
+          Tunnel active
+        </span>
+
+        <div class="flex items-center gap-0.5 rounded-lg border border-line bg-surface-0 p-1">
+          <button
+            type="button"
+            :disabled="sharing"
+            aria-label="Import connections"
+            title="Import connections from a shared file"
+            class="no-drag icon-action"
+            @click="importConnections"
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            :disabled="sharing"
+            aria-label="Export connections"
+            title="Export connections to share (no passwords)"
+            class="no-drag icon-action"
+            @click="exportConnections"
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 15V3m0 0-4 4m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            </svg>
+          </button>
+        </div>
+
+        <RouterLink
+          :to="{ name: 'settings' }"
+          class="no-drag icon-action"
+          aria-label="Settings"
+          title="Settings"
+        >
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <path d="M4 7h16M4 17h16" />
+            <circle cx="9" cy="7" r="3" fill="var(--color-surface-3)" />
+            <circle cx="15" cy="17" r="3" fill="var(--color-surface-3)" />
+          </svg>
+        </RouterLink>
+
         <button
           type="button"
           aria-label="Add connection"
           title="Add connection"
-          class="no-drag inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 shadow-sm text-sm font-semibold text-surface-1 transition hover:bg-brand-strong"
+          class="no-drag inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-3.5 shadow-sm text-sm font-semibold text-surface-1 transition hover:bg-brand-strong"
           @click="openAddMenu"
         >
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
           </svg>
           Add connection

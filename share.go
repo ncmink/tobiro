@@ -20,10 +20,18 @@ var shareFilters = []wailsruntime.FileFilter{
 // ExportConnections writes every connection to a YAML file the user picks, so
 // it can be handed to a colleague. Passwords are never part of the file — the
 // recipient adds their own after importing.
+//
+// Connections kept in hidden groups are left out, along with anything that
+// requires them, so a share file only describes what the sender still shows on
+// the dashboard by default.
 func (a *App) ExportConnections() (ExportResultView, error) {
-	profiles := a.profiles.List()
-	if len(profiles) == 0 {
+	all := a.profiles.List()
+	if len(all) == 0 {
 		return ExportResultView{}, fmt.Errorf("there is nothing to export yet — add a connection first")
+	}
+	profiles := filterProfilesForExport(all, a.profiles.GroupHidden)
+	if len(profiles) == 0 {
+		return ExportResultView{}, fmt.Errorf("there is nothing to export — every connection is in a hidden group")
 	}
 
 	raw, err := transfer.Marshal(transfer.Build(profiles, a.credentials.ListForProfile))
@@ -117,6 +125,49 @@ func (a *App) ImportConnections() (ImportResultView, error) {
 	a.log.Info("Imported %d connections and %d accounts from %s (%d skipped as already present)",
 		result.Connections, result.Accounts, path, len(result.Skipped))
 	return result, nil
+}
+
+// filterProfilesForExport drops connections in hidden groups and anything that
+// depends on them through requires, matching dashboard visibility.
+func filterProfilesForExport(profiles []domain.VPNProfile, groupHidden func(string) bool) []domain.VPNProfile {
+	if len(profiles) == 0 {
+		return nil
+	}
+	byID := make(map[string]domain.VPNProfile, len(profiles))
+	for _, p := range profiles {
+		byID[p.ID] = p
+	}
+
+	exportable := func(p domain.VPNProfile) bool {
+		if groupHidden(p.Group) {
+			return false
+		}
+		seen := make(map[string]struct{})
+		parentID := strings.TrimSpace(p.Requires)
+		for parentID != "" {
+			if _, loop := seen[parentID]; loop {
+				break
+			}
+			seen[parentID] = struct{}{}
+			parent, ok := byID[parentID]
+			if !ok {
+				break
+			}
+			if groupHidden(parent.Group) {
+				return false
+			}
+			parentID = strings.TrimSpace(parent.Requires)
+		}
+		return true
+	}
+
+	out := make([]domain.VPNProfile, 0, len(profiles))
+	for _, p := range profiles {
+		if exportable(p) {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // applyRequirements records "needs this up first" in a second pass, once every

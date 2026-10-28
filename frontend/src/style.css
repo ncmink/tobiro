@@ -90,59 +90,31 @@ button:not(:disabled), summary { cursor: pointer; }
 }
 ::selection { background: #cfb6f638; color: var(--color-ink); }
 
-.app-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  column-gap: 24px;
-  min-height: 106px;
-  padding: 38px 28px 16px;
+.app-titlebar {
+  height: 38px;
+  min-height: 38px;
   background: var(--color-menu);
-}
-.app-navigation {
-  display: flex;
-  justify-self: center;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-surface-0);
-}
-.app-header-actions {
-  justify-self: end;
-  margin-left: 0;
-}
-.app-nav-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 550;
-  color: var(--color-ink-muted);
-  transition: background 160ms, color 160ms;
-}
-.app-nav-link:hover { color: var(--color-ink); }
-.app-nav-link--active {
-  background: var(--color-surface-3);
-  color: var(--color-brand);
-  box-shadow: 0 1px 3px #0003, inset 0 1px #ffffff06;
 }
 .app-main { padding: 32px; scrollbar-gutter: stable; }
 .app-main > * { max-width: 1152px; margin-inline: auto; }
+.icon-action {
+  display: grid;
+  height: 2.25rem;
+  width: 2.25rem;
+  place-items: center;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-menu-button);
+  color: var(--color-ink-muted);
+  transition: color 160ms, border-color 160ms;
+}
+.icon-action svg {
+  height: 1rem;
+  width: 1rem;
+}
+.icon-action:hover:not(:disabled) { color: var(--color-ink); border-color: var(--color-line-strong); }
+.icon-action:disabled { opacity: 0.4; }
 @media (max-width: 900px) {
-  .app-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 14px;
-    padding-inline: 20px;
-  }
-  .app-navigation {
-    grid-row: 2;
-    grid-column: 1 / -1;
-    justify-self: stretch;
-  }
-  .app-nav-link { flex: 1; justify-content: center; }
   .app-main { padding: 24px 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -174,8 +146,4 @@ button:not(:disabled), summary { cursor: pointer; }
   --color-warn: #a46409;
   --color-bad: #d12f43;
   --color-info: #067bad;
-}
-:root[data-theme='light'] .app-nav-link--active {
-  background: #efe8fa;
-  box-shadow: 0 1px 3px #24253608;
 }

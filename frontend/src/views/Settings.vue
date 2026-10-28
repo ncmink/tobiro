@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import { ClearLogs, GetLogs } from '@bindings/go/main/App'
 import type { logging } from '@bindings/go/models'
@@ -68,6 +69,13 @@ function capabilityList(provider: (typeof store.providerStatus)[number]) {
 
 <template>
   <div class="space-y-6">
+    <RouterLink
+      :to="{ name: 'dashboard' }"
+      class="no-drag inline-flex items-center gap-1.5 text-sm text-ink-muted transition hover:text-ink"
+    >
+      &larr; Connections
+    </RouterLink>
+
     <header>
       <h1 class="text-2xl font-bold text-ink">Settings</h1>
       <p class="mt-1 text-sm text-ink-muted">

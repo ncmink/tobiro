@@ -74,6 +74,11 @@ Hiding is presentation only: nothing is deleted, a hidden connection still
 connects, and the dashboard's **Show hidden** toggle reveals those groups for as
 long as they are needed.
 
+An SSH tunnel that **requires** a VPN in a hidden group stays off the dashboard
+until hidden groups are revealed, even when the tunnel itself sits in another
+group or **Ungrouped**. It is still listed nested under that VPN once you turn
+**Show hidden** on.
+
 **Ungrouped** has no hide control, because it is not a company anyone is done
 with: it is where every connection without a group lands, so hiding it would
 mean the next one arrives invisible behind the very section that would have

@@ -24,6 +24,7 @@ import {
   UpdateCredential,
 } from '@bindings/go/main/App'
 import type { domain, main } from '@bindings/go/models'
+import { connectionMap, isDashboardVisible } from '@/lib/visibility'
 import { errorMessage } from '@/lib/state'
 
 /**
@@ -76,9 +77,11 @@ export const useConnectionsStore = defineStore('connections', () => {
     groups.value.filter((g) => g.hidden).reduce((total, g) => total + g.connections, 0),
   )
 
-  const visibleConnections = computed(() =>
-    showHidden.value ? connections.value : connections.value.filter((c) => !c.hidden),
-  )
+  const visibleConnections = computed(() => {
+    if (showHidden.value) return connections.value
+    const byId = connectionMap(connections.value)
+    return connections.value.filter((c) => isDashboardVisible(c, byId, false))
+  })
 
   async function loadBootstrap() {
     try {
