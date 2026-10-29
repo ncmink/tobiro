@@ -137,6 +137,7 @@ type CredentialView struct {
 	ProfileID      string     `json:"profileId"`
 	Label          string     `json:"label"`
 	Username       string     `json:"username"`
+	SecretRef      string     `json:"secretRef"`
 	AuthMethod     AuthMethod `json:"authMethod"`
 	IsDefault      bool       `json:"isDefault"`
 	HasPassword    bool       `json:"hasPassword"`
@@ -152,6 +153,7 @@ func (c Credential) View(hasPassword bool) CredentialView {
 		ProfileID:      c.ProfileID,
 		Label:          c.Label,
 		Username:       c.Username,
+		SecretRef:      c.SecretRef,
 		AuthMethod:     c.AuthMethod,
 		IsDefault:      c.IsDefault,
 		HasPassword:    hasPassword,

@@ -43,7 +43,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
           <span class="truncate font-mono">{{ credential.username || 'no username' }}</span>
           <span aria-hidden="true">&middot;</span>
           <span :class="credential.hasPassword ? 'text-ok' : 'text-warn'">
-            {{ credential.hasPassword ? 'Password saved' : 'No password saved' }}
+            {{ credential.hasPassword ? 'Password saved in Keychain' : 'No password saved' }}
           </span>
         </span>
       </span>

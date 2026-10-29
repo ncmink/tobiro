@@ -50,7 +50,27 @@ const pageError = ref('')
 const startup = ref<domain.StartupState | null>(null)
 const startupBusy = ref(false)
 const diagnosis = ref<domain.NetworkDiagnosis | null>(null)
+const copiedSecretRef = ref('')
+let copiedSecretTimer: number | undefined
 let diagnosisPoll: number | undefined
+
+function secretRefOf(credential: domain.CredentialView): string {
+  return credential.secretRef || `tobiro/${credential.profileId}/${credential.id}`
+}
+
+async function copySecretRef(credential: domain.CredentialView) {
+  const refText = secretRefOf(credential)
+  try {
+    await navigator.clipboard.writeText(refText)
+    copiedSecretRef.value = credential.id
+    if (copiedSecretTimer !== undefined) window.clearTimeout(copiedSecretTimer)
+    copiedSecretTimer = window.setTimeout(() => {
+      copiedSecretRef.value = ''
+    }, 1500)
+  } catch {
+    // Ignore clipboard rejection; the reference is still shown in the row and tooltip.
+  }
+}
 
 const state = computed(() => sessions.sessionFor(props.id)?.state ?? connection.value?.state ?? 'disconnected')
 const session = computed(() => sessions.sessionFor(props.id) ?? connection.value?.session)
@@ -310,6 +330,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (diagnosisPoll !== undefined) window.clearInterval(diagnosisPoll)
+  if (copiedSecretTimer !== undefined) window.clearTimeout(copiedSecretTimer)
 })
 
 </script>
@@ -561,10 +582,27 @@ onUnmounted(() => {
           <div class="min-w-0 flex-1">
             <p class="truncate font-medium text-ink">{{ credential.label }} <span v-if="credential.isDefault" class="ml-2 rounded bg-brand/10 px-2 py-0.5 text-xs font-normal text-brand">Default</span></p>
             <p class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-<template v-if="!isSSH"><span class="font-mono">{{ credential.username || 'no username' }}</span><span aria-hidden="true">&middot;</span></template>
+              <template v-if="!isSSH"><span class="font-mono">{{ credential.username || 'no username' }}</span><span aria-hidden="true">&middot;</span></template>
               <span :class="credential.authMethod !== 'password' || credential.hasPassword ? 'text-ok' : 'text-warn'">
-                {{ credential.authMethod === 'password' ? (credential.hasPassword ? 'Password saved' : 'No password saved') : credential.authMethod === 'ssh_key' ? 'SSH key' : credential.authMethod }}
+                {{ credential.authMethod === 'password' ? (credential.hasPassword ? 'Password saved in Keychain' : 'No password saved') : credential.authMethod === 'ssh_key' ? (credential.hasPassword ? 'SSH key · passphrase saved in Keychain' : 'SSH key') : credential.authMethod }}
               </span>
+              <template v-if="credential.hasPassword">
+                <span aria-hidden="true">&middot;</span>
+                <button
+                  type="button"
+                  class="no-drag inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] text-ink-faint transition hover:bg-surface-2 hover:text-ink"
+                  :title="`Keychain account reference (Service: Tobiro) — click to copy ${secretRefOf(credential)}`"
+                  @click="copySecretRef(credential)"
+                >
+                  <span class="truncate">{{ secretRefOf(credential) }}</span>
+                  <span
+                    class="font-sans text-[10px] font-medium"
+                    :class="copiedSecretRef === credential.id ? 'text-ok' : 'text-ink-faint'"
+                  >
+                    {{ copiedSecretRef === credential.id ? 'Copied' : 'Copy' }}
+                  </span>
+                </button>
+              </template>
             </p>
           </div>
 

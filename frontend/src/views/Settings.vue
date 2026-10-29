@@ -128,9 +128,12 @@ function capabilityList(provider: (typeof store.providerStatus)[number]) {
         a reference to each secret, never the secret itself, and passwords are never sent to the
         user interface.
       </p>
-      <p v-if="bootstrap?.dataPath" class="mt-3 truncate font-mono text-xs text-ink-faint">
-        {{ bootstrap.dataPath }}
-      </p>
+      <div class="mt-3 space-y-1 font-mono text-xs text-ink-faint">
+        <p>Service: Tobiro</p>
+        <p v-if="bootstrap?.dataPath" class="truncate">
+          {{ bootstrap.dataPath }}
+        </p>
+      </div>
     </section>
 
     <!-- Provider detection -->

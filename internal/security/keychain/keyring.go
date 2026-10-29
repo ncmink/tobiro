@@ -57,7 +57,7 @@ func (s *Store) Available() (bool, string) {
 	s.probed = true
 
 	const canary = "tobiro/_probe/_probe"
-	if err := keyring.Set(serviceName, canary, "probe"); err != nil {
+	if err := platformSet(serviceName, canary, security.SecretWrite{Value: "probe"}); err != nil {
 		s.available = false
 		s.reason = fmt.Sprintf("%s is not accessible: %v", s.Backend(), err)
 		return s.available, s.reason
@@ -70,15 +70,14 @@ func (s *Store) Available() (bool, string) {
 }
 
 // Set stores or replaces a secret.
-func (s *Store) Set(ref string, secret string) error {
+func (s *Store) Set(ref string, write security.SecretWrite) error {
 	if err := security.ValidateSecretRef(ref); err != nil {
 		return err
 	}
-	if secret == "" {
+	if write.Value == "" {
 		return errors.New("refusing to store an empty secret")
 	}
-	if err := keyring.Set(serviceName, ref, secret); err != nil {
-		// The error is wrapped without the secret ever being interpolated.
+	if err := platformSet(serviceName, ref, write); err != nil {
 		return fmt.Errorf("store secret in %s: %w", s.Backend(), err)
 	}
 	return nil

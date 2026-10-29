@@ -111,6 +111,7 @@ export namespace domain {
 	    profileId: string;
 	    label: string;
 	    username: string;
+	    secretRef: string;
 	    authMethod: string;
 	    isDefault: boolean;
 	    hasPassword: boolean;
@@ -130,6 +131,7 @@ export namespace domain {
 	        this.profileId = source["profileId"];
 	        this.label = source["label"];
 	        this.username = source["username"];
+	        this.secretRef = source["secretRef"];
 	        this.authMethod = source["authMethod"];
 	        this.isDefault = source["isDefault"];
 	        this.hasPassword = source["hasPassword"];

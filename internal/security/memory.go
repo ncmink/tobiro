@@ -39,15 +39,15 @@ func (m *MemoryStore) Available() (bool, string) {
 }
 
 // Set stores a secret in memory.
-func (m *MemoryStore) Set(ref string, secret string) error {
+func (m *MemoryStore) Set(ref string, write SecretWrite) error {
 	if err := ValidateSecretRef(ref); err != nil {
 		return err
 	}
-	if secret == "" {
+	if write.Value == "" {
 		return errors.New("refusing to store an empty secret")
 	}
 	m.mu.Lock()
-	m.secrets[ref] = secret
+	m.secrets[ref] = write.Value
 	m.mu.Unlock()
 	return nil
 }

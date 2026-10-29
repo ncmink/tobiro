@@ -19,9 +19,17 @@ import (
 //	macOS   -> Keychain
 //	Windows -> Credential Manager
 //	Linux   -> Secret Service / keyring
+// SecretWrite is what Set persists. Comment is optional metadata for the OS
+// credential store (Keychain "Comments" on macOS). It must never contain the
+// secret itself.
+type SecretWrite struct {
+	Value   string
+	Comment string
+}
+
 type SecureCredentialStore interface {
 	// Set stores or replaces the secret for ref.
-	Set(ref string, secret string) error
+	Set(ref string, write SecretWrite) error
 
 	// Get returns the secret for ref, or domain.ErrSecretNotFound.
 	Get(ref string) (string, error)

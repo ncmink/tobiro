@@ -175,7 +175,11 @@ func (s *Service) Create(profileID string, in domain.CredentialInput) (domain.Cr
 
 	hasPassword := false
 	if in.Password != "" {
-		if err := s.secrets.Set(cred.SecretRef, in.Password); err != nil {
+		write := security.SecretWrite{
+			Value:   in.Password,
+			Comment: s.keychainComment(profileID),
+		}
+		if err := s.secrets.Set(cred.SecretRef, write); err != nil {
 			// Metadata is already committed; report the storage failure so the
 			// user can retry rather than silently having no password.
 			s.log.Error("Could not save password for credential=%s: %v", cred.ID, err)
@@ -227,7 +231,11 @@ func (s *Service) Update(id string, in domain.CredentialInput) (domain.Credentia
 	}
 
 	if in.Password != "" {
-		if err := s.secrets.Set(updated.SecretRef, in.Password); err != nil {
+		write := security.SecretWrite{
+			Value:   in.Password,
+			Comment: s.keychainComment(updated.ProfileID),
+		}
+		if err := s.secrets.Set(updated.SecretRef, write); err != nil {
 			s.log.Error("Could not update password for credential=%s: %v", id, err)
 			return updated.View(s.secrets.Has(updated.SecretRef)),
 				fmt.Errorf("credential saved, but storing the password failed: %w", err)
@@ -419,4 +427,36 @@ func removeString(list []string, value string) []string {
 		}
 	}
 	return out
+}
+
+// keychainComment is stored in the macOS Keychain "Comments" field so entries
+// are recognisable in Keychain Access. It never contains the password.
+func (s *Service) keychainComment(profileID string) string {
+	var profile domain.VPNProfile
+	var parentName string
+	s.store.Read(func(d *store.Data) {
+		for _, p := range d.Profiles {
+			if p.ID == profileID {
+				profile = p
+				break
+			}
+		}
+		if profile.Requires == "" {
+			return
+		}
+		for _, p := range d.Profiles {
+			if p.ID == profile.Requires {
+				parentName = p.Name
+				break
+			}
+		}
+	})
+
+	if profile.IsSSH() {
+		if parentName != "" {
+			return fmt.Sprintf("Connection: %s\nSSH tunnel: %s", parentName, profile.Name)
+		}
+		return fmt.Sprintf("SSH tunnel: %s", profile.Name)
+	}
+	return fmt.Sprintf("Connection: %s", profile.Name)
 }
