@@ -450,7 +450,7 @@ async function confirmFill(credentialId: string) {
           Tunnel active
         </span>
 
-        <div class="flex items-center gap-0.5 rounded-lg border border-line bg-surface-0 p-1">
+        <div class="icon-toolbar">
           <button
             type="button"
             :disabled="sharing"
@@ -475,20 +475,26 @@ async function confirmFill(credentialId: string) {
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 15V3m0 0-4 4m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
             </svg>
           </button>
+          <RouterLink
+            :to="{ name: 'settings' }"
+            class="no-drag icon-action"
+            aria-label="Settings"
+            title="Settings"
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </RouterLink>
         </div>
-
-        <RouterLink
-          :to="{ name: 'settings' }"
-          class="no-drag icon-action"
-          aria-label="Settings"
-          title="Settings"
-        >
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-            <path d="M4 7h16M4 17h16" />
-            <circle cx="9" cy="7" r="3" fill="var(--color-surface-3)" />
-            <circle cx="15" cy="17" r="3" fill="var(--color-surface-3)" />
-          </svg>
-        </RouterLink>
 
         <button
           type="button"

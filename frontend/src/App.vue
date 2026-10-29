@@ -3,7 +3,7 @@ import { onMounted, onUnmounted } from 'vue'
 import { RouterView, useRouter } from 'vue-router'
 
 import { TakeConnectRequest } from '@bindings/go/main/App'
-import { EventsOn } from '@bindings/runtime/runtime'
+import { Environment, EventsOn } from '@bindings/runtime/runtime'
 import HostKeyDialog from '@/components/HostKeyDialog.vue'
 import OtpDialog from '@/components/OtpDialog.vue'
 import { useConnectionSharing } from '@/lib/connectionSharing'
@@ -28,6 +28,10 @@ async function collectConnectRequest() {
 }
 
 onMounted(async () => {
+  if ('runtime' in window) {
+    const env = await Environment()
+    document.documentElement.dataset.platform = env.platform
+  }
   sessions.init()
   await store.loadBootstrap()
   await store.refresh()

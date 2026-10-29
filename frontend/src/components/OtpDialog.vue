@@ -54,19 +54,10 @@ async function cancel() {
     </form>
 
     <template #footer>
-      <button
-        type="button"
-        class="rounded-xl px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
-        @click="cancel"
-      >
+      <button type="button" class="btn-ghost" @click="cancel">
         Cancel
       </button>
-      <button
-        type="button"
-        class="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-surface-1 transition hover:bg-brand-strong disabled:opacity-50"
-        :disabled="sessions.otpSubmitting"
-        @click="submit"
-      >
+      <button type="button" class="btn-brand" :disabled="sessions.otpSubmitting" @click="submit">
         {{ sessions.otpSubmitting ? 'Verifying…' : 'Continue' }}
       </button>
     </template>

@@ -14,7 +14,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
     <label
       v-for="credential in credentials"
       :key="credential.id"
-      class="flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition"
+      class="no-drag flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition"
       :class="
         modelValue === credential.id
           ? 'border-brand/60 bg-brand/10'
@@ -39,9 +39,9 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
             Default
           </span>
         </span>
-        <span class="mt-0.5 flex items-center gap-2 text-xs text-ink-muted">
-          <span class="truncate font-mono">{{ credential.username || 'no username' }}</span>
-          <span aria-hidden="true">&middot;</span>
+        <span class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+          <span v-if="credential.username" class="font-mono">{{ credential.username }}</span>
+          <span v-if="credential.username" aria-hidden="true">&middot;</span>
           <span :class="credential.hasPassword ? 'text-ok' : 'text-warn'">
             {{ credential.hasPassword ? 'Password saved in Keychain' : 'No password saved' }}
           </span>

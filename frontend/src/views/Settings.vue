@@ -69,10 +69,7 @@ function capabilityList(provider: (typeof store.providerStatus)[number]) {
 
 <template>
   <div class="space-y-6">
-    <RouterLink
-      :to="{ name: 'dashboard' }"
-      class="no-drag inline-flex items-center gap-1.5 text-sm text-ink-muted transition hover:text-ink"
-    >
+    <RouterLink :to="{ name: 'dashboard' }" class="back-link">
       &larr; Connections
     </RouterLink>
 
@@ -128,12 +125,16 @@ function capabilityList(provider: (typeof store.providerStatus)[number]) {
         a reference to each secret, never the secret itself, and passwords are never sent to the
         user interface.
       </p>
-      <div class="mt-3 space-y-1 font-mono text-xs text-ink-faint">
-        <p>Service: Tobiro</p>
-        <p v-if="bootstrap?.dataPath" class="truncate">
-          {{ bootstrap.dataPath }}
-        </p>
-      </div>
+      <dl class="mt-3 space-y-2 text-xs">
+        <div class="flex flex-wrap gap-x-2 gap-y-1">
+          <dt class="font-medium text-ink-muted">Keychain service</dt>
+          <dd class="font-mono text-ink-faint">Tobiro</dd>
+        </div>
+        <div v-if="bootstrap?.dataPath" class="flex flex-wrap gap-x-2 gap-y-1">
+          <dt class="shrink-0 font-medium text-ink-muted">Application data</dt>
+          <dd class="min-w-0 truncate font-mono text-ink-faint">{{ bootstrap.dataPath }}</dd>
+        </div>
+      </dl>
     </section>
 
     <!-- Provider detection -->

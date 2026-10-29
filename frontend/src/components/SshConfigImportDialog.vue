@@ -160,16 +160,12 @@ watch(
     </div>
 
     <template #footer>
-      <button
-        type="button"
-        class="rounded-lg px-3 py-2 text-sm text-ink-muted hover:bg-ink/5"
-        @click="emit('close')"
-      >
+      <button type="button" class="btn-ghost" @click="emit('close')">
         Cancel
       </button>
       <button
         type="button"
-        class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-surface-1 hover:bg-brand-strong disabled:opacity-40"
+        class="btn-brand"
         :disabled="importing || selected.size === 0"
         @click="submit"
       >

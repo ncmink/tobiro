@@ -24,7 +24,7 @@ const emit = defineEmits<{ close: [] }>()
         </div>
         <button
           type="button"
-          class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-faint transition hover:bg-ink/5 hover:text-ink"
+          class="no-drag grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-transparent text-ink-faint transition hover:border-line hover:bg-ink/5 hover:text-ink"
           aria-label="Close"
           @click="emit('close')"
         >

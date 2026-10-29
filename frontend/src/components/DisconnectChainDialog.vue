@@ -26,18 +26,10 @@ const emit = defineEmits<{
     </ul>
 
     <template #footer>
-      <button
-        type="button"
-        class="rounded-xl px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
-        @click="emit('close')"
-      >
+      <button type="button" class="btn-ghost" @click="emit('close')">
         Cancel
       </button>
-      <button
-        type="button"
-        class="rounded-xl border border-bad/60 px-4 py-2 text-sm font-semibold text-bad transition hover:bg-bad/10"
-        @click="emit('confirm')"
-      >
+      <button type="button" class="btn-danger-outline" @click="emit('confirm')">
         Disconnect all
       </button>
     </template>

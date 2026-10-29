@@ -338,16 +338,13 @@ onUnmounted(() => {
 <template>
   <div v-if="!connection" class="py-20 text-center">
     <p class="text-ink-muted">This connection no longer exists.</p>
-    <RouterLink :to="{ name: 'dashboard' }" class="mt-3 inline-block text-sm text-brand">
+    <RouterLink :to="{ name: 'dashboard' }" class="back-link mt-3">
       Back to connections
     </RouterLink>
   </div>
 
   <div v-else class="mx-auto w-full max-w-5xl space-y-5">
-    <RouterLink
-      :to="{ name: 'dashboard' }"
-      class="inline-flex items-center gap-1.5 text-sm text-ink-muted transition hover:text-ink"
-    >
+    <RouterLink :to="{ name: 'dashboard' }" class="back-link">
       &larr; Connections
     </RouterLink>
 
@@ -582,46 +579,46 @@ onUnmounted(() => {
           <div class="min-w-0 flex-1">
             <p class="truncate font-medium text-ink">{{ credential.label }} <span v-if="credential.isDefault" class="ml-2 rounded bg-brand/10 px-2 py-0.5 text-xs font-normal text-brand">Default</span></p>
             <p class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-              <template v-if="!isSSH"><span class="font-mono">{{ credential.username || 'no username' }}</span><span aria-hidden="true">&middot;</span></template>
+              <template v-if="!isSSH && credential.username">
+                <span class="font-mono">{{ credential.username }}</span>
+                <span aria-hidden="true">&middot;</span>
+              </template>
               <span :class="credential.authMethod !== 'password' || credential.hasPassword ? 'text-ok' : 'text-warn'">
                 {{ credential.authMethod === 'password' ? (credential.hasPassword ? 'Password saved in Keychain' : 'No password saved') : credential.authMethod === 'ssh_key' ? (credential.hasPassword ? 'SSH key · passphrase saved in Keychain' : 'SSH key') : credential.authMethod }}
               </span>
-              <template v-if="credential.hasPassword">
-                <span aria-hidden="true">&middot;</span>
-                <button
-                  type="button"
-                  class="no-drag inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[11px] text-ink-faint transition hover:bg-surface-2 hover:text-ink"
-                  :title="`Keychain account reference (Service: Tobiro) — click to copy ${secretRefOf(credential)}`"
-                  @click="copySecretRef(credential)"
+            </p>
+            <p v-if="credential.hasPassword" class="mt-1.5">
+              <button
+                type="button"
+                class="no-drag inline-flex max-w-full items-center gap-2 rounded-lg border border-line/80 bg-surface-0/60 px-2.5 py-1 text-left text-[11px] text-ink-muted transition hover:border-line-strong hover:text-ink"
+                :title="`Service: Tobiro · Account: ${secretRefOf(credential)}`"
+                @click="copySecretRef(credential)"
+              >
+                <span class="truncate font-mono">{{ secretRefOf(credential) }}</span>
+                <span
+                  class="shrink-0 font-sans font-medium"
+                  :class="copiedSecretRef === credential.id ? 'text-ok' : 'text-ink-faint'"
                 >
-                  <span class="truncate">{{ secretRefOf(credential) }}</span>
-                  <span
-                    class="font-sans text-[10px] font-medium"
-                    :class="copiedSecretRef === credential.id ? 'text-ok' : 'text-ink-faint'"
-                  >
-                    {{ copiedSecretRef === credential.id ? 'Copied' : 'Copy' }}
-                  </span>
-                </button>
-              </template>
+                  {{ copiedSecretRef === credential.id ? 'Copied' : 'Copy' }}
+                </span>
+              </button>
             </p>
           </div>
 
-          <div class="flex items-center gap-1.5">
-            <button
-              v-if="!credential.isDefault"
-              type="button"
-              class="no-drag rounded-lg px-2.5 py-1.5 text-xs font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
-              @click="store.makeDefaultCredential(credential.id)"
-            >
-              Make default
-            </button>
-            <button
-              type="button"
-              class="no-drag rounded-lg px-2.5 py-1.5 text-xs font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
-              @click="openCredentialForm(credential)"
-            >
-              Edit
-            </button>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="text-actions">
+              <button
+                v-if="!credential.isDefault"
+                type="button"
+                class="no-drag"
+                @click="store.makeDefaultCredential(credential.id)"
+              >
+                Make default
+              </button>
+              <button type="button" class="no-drag" @click="openCredentialForm(credential)">
+                Edit
+              </button>
+            </div>
             <button
               type="button"
               class="no-drag rounded-lg px-2.5 py-1.5 text-xs font-medium text-bad border border-bad/30 bg-bad/10 transition hover:border-bad/60 hover:bg-bad/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bad"
