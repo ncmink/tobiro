@@ -38,6 +38,8 @@ import { errorMessage } from '@/lib/state'
 /** Whether hidden groups are currently revealed. A view preference, not data. */
 const showHiddenKey = 'tobiro.show-hidden-groups'
 const legacyShowHiddenKeys = ['biebie-access.show-hidden-groups', 'januz.show-hidden-groups']
+/** Parent connection IDs whose nested SSH tunnels / dependents are collapsed on the dashboard. */
+const collapsedChildrenKey = 'tobiro.collapsed-children'
 
 function readShowHidden(): boolean {
   try {
@@ -53,6 +55,24 @@ function readShowHidden(): boolean {
   return false
 }
 
+function readCollapsedChildren(): string[] {
+  try {
+    const raw = localStorage.getItem(collapsedChildrenKey)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      return parsed.filter((id): id is string => typeof id === 'string' && id.length > 0)
+    }
+  } catch { /* ignore */ }
+  return []
+}
+
+function writeCollapsedChildren(ids: string[]) {
+  try {
+    localStorage.setItem(collapsedChildrenKey, JSON.stringify(ids))
+  } catch { /* ignore */ }
+}
+
 export const useConnectionsStore = defineStore('connections', () => {
   const connections = ref<main.ConnectionView[]>([])
   const groups = ref<domain.GroupView[]>([])
@@ -63,6 +83,7 @@ export const useConnectionsStore = defineStore('connections', () => {
   const loaded = ref(false)
   const error = ref('')
   const showHidden = ref(readShowHidden())
+  const collapsedChildrenIds = ref<string[]>(readCollapsedChildren())
 
   const byId = computed(
     () => (id: string) => connections.value.find((c) => c.profile.id === id) ?? null,
@@ -114,6 +135,36 @@ export const useConnectionsStore = defineStore('connections', () => {
 
   function toggleShowHidden() {
     setShowHidden(!showHidden.value)
+  }
+
+  function isChildrenCollapsed(profileId: string): boolean {
+    return collapsedChildrenIds.value.includes(profileId)
+  }
+
+  function setChildrenCollapsed(profileId: string, collapsed: boolean) {
+    const exists = collapsedChildrenIds.value.includes(profileId)
+    if (collapsed && !exists) {
+      collapsedChildrenIds.value = [...collapsedChildrenIds.value, profileId]
+      writeCollapsedChildren(collapsedChildrenIds.value)
+    } else if (!collapsed && exists) {
+      collapsedChildrenIds.value = collapsedChildrenIds.value.filter((id) => id !== profileId)
+      writeCollapsedChildren(collapsedChildrenIds.value)
+    }
+  }
+
+  function toggleChildrenCollapsed(profileId: string) {
+    setChildrenCollapsed(profileId, !isChildrenCollapsed(profileId))
+  }
+
+  function setAllChildrenCollapsed(profileIds: string[], collapsed: boolean) {
+    if (collapsed) {
+      const merged = new Set([...collapsedChildrenIds.value, ...profileIds])
+      collapsedChildrenIds.value = Array.from(merged)
+    } else {
+      const toExpand = new Set(profileIds)
+      collapsedChildrenIds.value = collapsedChildrenIds.value.filter((id) => !toExpand.has(id))
+    }
+    writeCollapsedChildren(collapsedChildrenIds.value)
   }
 
   /** Hides or reveals a whole group. Nothing is deleted — this is presentation. */
@@ -268,6 +319,11 @@ export const useConnectionsStore = defineStore('connections', () => {
     refresh,
     setShowHidden,
     toggleShowHidden,
+    collapsedChildrenIds,
+    isChildrenCollapsed,
+    setChildrenCollapsed,
+    toggleChildrenCollapsed,
+    setAllChildrenCollapsed,
     setGroupHidden,
     loadProviderStatus,
     createConnection,

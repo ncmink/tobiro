@@ -129,6 +129,20 @@ const allHidden = computed(
   () => !store.isEmpty && store.visibleConnections.length === 0 && store.hiddenCount > 0,
 )
 
+const parentIdsWithChildren = computed(() =>
+  trees.value.filter((node) => node.children.length > 0).map((node) => node.item.profile.id),
+)
+
+const allChildrenCollapsed = computed(
+  () =>
+    parentIdsWithChildren.value.length > 0 &&
+    parentIdsWithChildren.value.every((id) => store.isChildrenCollapsed(id)),
+)
+
+function toggleAllChildrenCollapsed() {
+  store.setAllChildrenCollapsed(parentIdsWithChildren.value, !allChildrenCollapsed.value)
+}
+
 async function setGroupHidden(name: string, hidden: boolean) {
   groupError.value = ''
   try {
@@ -241,6 +255,13 @@ const menuItems = computed<ContextMenuItem[]>(() => {
   if (target.profile.kind !== 'ssh') {
     items.push({ id: 'ssh-config', label: 'Import from SSH config…' })
   }
+  if (dependentsOf(target).length > 0) {
+    const collapsed = store.isChildrenCollapsed(target.profile.id)
+    items.push({
+      id: 'toggle-children',
+      label: collapsed ? 'Expand SSH tunnels' : 'Collapse SSH tunnels',
+    })
+  }
 
   // Filing a connection elsewhere is a one-click job here rather than a trip
   // through the edit form. Every group is a destination except the one the
@@ -310,6 +331,9 @@ function runMenuAction(id: string) {
       break
     case 'ssh-config':
       sshConfigTarget.value = target
+      break
+    case 'toggle-children':
+      store.toggleChildrenCollapsed(target.profile.id)
       break
     case 'group':
       void setGroupHidden(target.profile.group, !target.hidden)
@@ -490,6 +514,27 @@ async function confirmFill(credentialId: string) {
         </button>
       </div>
       <div class="flex max-w-full flex-wrap items-center gap-2">
+        <button
+          v-if="parentIdsWithChildren.length"
+          type="button"
+          class="no-drag inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface-0 px-3 py-2 text-sm font-medium text-ink-muted transition hover:border-line-strong hover:text-ink"
+          :title="allChildrenCollapsed ? 'Expand nested SSH tunnels on all connections' : 'Collapse nested SSH tunnels on all connections'"
+          @click="toggleAllChildrenCollapsed"
+        >
+          <svg
+            aria-hidden="true"
+            class="h-4 w-4 transition-transform duration-150"
+            :class="{ 'rotate-90': !allChildrenCollapsed }"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" />
+          </svg>
+          {{ allChildrenCollapsed ? 'Expand tunnels' : 'Collapse tunnels' }}
+        </button>
+
         <button
           v-if="store.hiddenCount"
           type="button"

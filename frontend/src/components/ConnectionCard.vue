@@ -8,6 +8,7 @@ import ForwardList from '@/components/ForwardList.vue'
 import ProviderIcon from '@/components/ProviderIcon.vue'
 import { descendants, type ChainNode } from '@/lib/chain'
 import { canConnect, formatDuration, isActive, stateStyle } from '@/lib/state'
+import { useConnectionsStore } from '@/stores/connections'
 import { useSessionsStore } from '@/stores/sessions'
 
 defineOptions({ name: 'ConnectionCard' })
@@ -29,6 +30,7 @@ const emit = defineEmits<{
   menu: [connection: main.ConnectionView, event: MouseEvent]
 }>()
 
+const connectionsStore = useConnectionsStore()
 const sessions = useSessionsStore()
 
 const profileId = computed(() => props.connection.profile.id)
@@ -62,6 +64,12 @@ const childHeading = computed(() => {
   const allSSH = childNodes.value.every((child) => child.item.profile.kind === 'ssh')
   return allSSH ? 'SSH tunnels' : 'Dependents'
 })
+const childrenCollapsed = computed(() => connectionsStore.isChildrenCollapsed(profileId.value))
+const childErrorsCount = computed(() =>
+  descendants(props.node ?? { item: props.connection, children: [], missingParent: false, cyclic: false }).filter(
+    (child) => Boolean(sessions.errorFor(child.profile.id)),
+  ).length,
+)
 
 const activeDependents = computed(() =>
   descendants(props.node ?? { item: props.connection, children: [], missingParent: false, cyclic: false }).filter(
@@ -259,12 +267,53 @@ function openMenu(event: MouseEvent) {
 
     <p v-if="error" role="alert" class="mt-3 rounded-xl bg-bad/10 px-3 py-2 text-xs leading-relaxed text-bad">{{ error }}</p>
 
-    <section v-if="childNodes.length" class="connection-children" :aria-label="`${childHeading} via ${connection.profile.name}`">
-      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 class="text-xs font-semibold text-ink-muted">{{ childHeading }} <span class="ml-1 font-normal text-ink-faint">{{ childNodes.length }}</span></h3>
-        <span v-if="activeDependents.length" class="text-xs text-ink-muted">{{ activeDependents.length }} active</span>
-      </div>
-      <div class="space-y-2">
+    <section
+      v-if="childNodes.length"
+      class="connection-children"
+      :class="{ 'connection-children--collapsed': childrenCollapsed }"
+      :aria-label="`${childHeading} via ${connection.profile.name}`"
+    >
+      <button
+        type="button"
+        class="connection-children-toggle no-drag"
+        :aria-expanded="!childrenCollapsed"
+        :title="childrenCollapsed ? `Show ${childNodes.length} ${childHeading.toLowerCase()}` : `Hide ${childHeading.toLowerCase()}`"
+        @click="connectionsStore.toggleChildrenCollapsed(profileId)"
+      >
+        <span class="flex min-w-0 items-center gap-2">
+          <svg
+            aria-hidden="true"
+            class="h-3.5 w-3.5 shrink-0 text-ink-faint transition-transform duration-150"
+            :class="{ 'rotate-90': !childrenCollapsed }"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" />
+          </svg>
+          <span class="text-xs font-semibold text-ink-muted">
+            {{ childHeading }}
+            <span class="ml-1 rounded-full bg-surface-2 px-1.5 py-0.5 font-normal text-ink-faint">{{ childNodes.length }}</span>
+          </span>
+          <span
+            v-if="activeDependents.length"
+            class="rounded-full bg-ok/15 px-2 py-0.5 text-[11px] font-medium text-ok"
+          >
+            {{ activeDependents.length }} active
+          </span>
+          <span
+            v-if="childrenCollapsed && childErrorsCount"
+            class="rounded-full bg-bad/15 px-2 py-0.5 text-[11px] font-medium text-bad"
+          >
+            {{ childErrorsCount }} {{ childErrorsCount === 1 ? 'issue' : 'issues' }}
+          </span>
+        </span>
+        <span class="text-[11px] font-medium text-ink-faint transition group-hover:text-ink">
+          {{ childrenCollapsed ? 'Show' : 'Hide' }}
+        </span>
+      </button>
+      <div v-if="!childrenCollapsed" class="mt-3 space-y-2">
         <ConnectionCard
           v-for="child in childNodes"
           :key="child.item.profile.id"
@@ -333,7 +382,10 @@ function openMenu(event: MouseEvent) {
 .connection-facts dt { @apply text-[10px] font-medium uppercase tracking-wider text-ink-faint; }
 .connection-facts dd { @apply mt-1 truncate text-ink; }
 .connection-children {
-  @apply mt-4 border-t border-line pt-4;
+  @apply mt-3 border-t border-line pt-2.5;
+}
+.connection-children-toggle {
+  @apply -mx-1.5 flex w-[calc(100%+0.75rem)] items-center justify-between gap-2 rounded-lg px-1.5 py-1 text-left transition hover:bg-surface-2/70 focus-visible:outline-2 focus-visible:outline-brand;
 }
 @container (max-width: 360px) {
   .connection-row { flex-wrap: wrap; }
