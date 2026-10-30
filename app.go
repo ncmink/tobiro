@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -124,6 +125,9 @@ func (a *App) GetBootstrap() BootstrapView {
 	// Offer only adapters included in this build.
 	providers := make([]domain.ProviderInfo, 0)
 	for _, provider := range domain.SupportedProviders() {
+		if provider.ID == domain.ProviderMacOSVPN && runtime.GOOS != "darwin" {
+			continue
+		}
 		if _, err := a.registry.Get(provider.ID); err == nil {
 			providers = append(providers, provider)
 		}
@@ -136,6 +140,7 @@ func (a *App) GetBootstrap() BootstrapView {
 		SecretStatusText: detail,
 		DataPath:         a.store.Path(),
 		Version:          appVersion,
+		Platform:         runtime.GOOS,
 	}
 }
 

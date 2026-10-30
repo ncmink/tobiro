@@ -19,7 +19,12 @@ export const useFillShortcutStore = defineStore('fillShortcut', () => {
   const saveError = ref('')
 
   const supported = computed(() => shortcut.value?.supported === true)
-  const display = computed(() => shortcut.value?.display || '⌘I')
+  const display = computed(() => {
+    if (shortcut.value?.display) return shortcut.value.display
+    const platform =
+      typeof document !== 'undefined' ? document.documentElement.dataset.platform : undefined
+    return platform === 'darwin' ? '⌘I' : 'Ctrl+I'
+  })
   const showIntro = computed(
     () => supported.value && shortcut.value != null && !shortcut.value.introSeen,
   )

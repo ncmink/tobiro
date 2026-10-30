@@ -672,6 +672,7 @@ export namespace main {
 	    secretStatusText: string;
 	    dataPath: string;
 	    version: string;
+	    platform: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new BootstrapView(source);
@@ -686,6 +687,7 @@ export namespace main {
 	        this.secretStatusText = source["secretStatusText"];
 	        this.dataPath = source["dataPath"];
 	        this.version = source["version"];
+	        this.platform = source["platform"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

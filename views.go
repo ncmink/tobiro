@@ -62,6 +62,7 @@ type BootstrapView struct {
 
 	DataPath string `json:"dataPath"`
 	Version  string `json:"version"`
+	Platform string `json:"platform"`
 }
 
 // ConnectRequestView is pushed to the UI when another biebie.net application

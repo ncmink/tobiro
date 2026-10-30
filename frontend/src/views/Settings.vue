@@ -341,11 +341,12 @@ function capabilityList(provider: (typeof store.providerStatus)[number]) {
             <div>
               <h2 id="fill-shortcut-heading" class="text-base font-semibold text-ink">Fill login shortcut</h2>
               <p class="mt-1 text-sm text-ink-muted">
-                Global shortcut while a supported VPN login window is open. Default is ⌘I.
+                Global shortcut while a supported VPN login window is open. Default is
+                {{ fillShortcut.display }}.
               </p>
             </div>
             <kbd class="rounded-lg border border-line-strong bg-surface-0 px-3 py-1.5 font-mono text-sm text-ink">
-              {{ fillShortcut.shortcut?.display || '⌘I' }}
+              {{ fillShortcut.shortcut?.display || fillShortcut.display }}
             </kbd>
           </div>
 
@@ -382,7 +383,7 @@ function capabilityList(provider: (typeof store.providerStatus)[number]) {
               class="no-drag rounded-xl px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
               @click="fillShortcut.reset()"
             >
-              Reset to ⌘I
+              Reset to {{ fillShortcut.display }}
             </button>
             <button
               type="button"

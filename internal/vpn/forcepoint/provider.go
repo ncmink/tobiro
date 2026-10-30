@@ -88,7 +88,7 @@ func (p *Provider) Capabilities(ctx context.Context) (*domain.Capabilities, erro
 		CanConnect:       false,
 		CanDisconnect:    false,
 		CanReadStatus:    info.Installed && tunnel.Supported(),
-		SupportsPassword: runtime.GOOS == "darwin",
+		SupportsPassword: info.Installed,
 		SupportsOTP:      false,
 		RequiresNativeUI: true,
 	}

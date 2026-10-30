@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -16,10 +17,12 @@ func applicationMenu(app *App) *menu.Menu {
 	m.Append(menu.EditMenu())
 
 	conn := m.AddSubmenu("Connection")
-	combo, _ := hotkeyspec.Parse(app.fillHotkeyStorage())
-	conn.AddText("Fill VPN login", wailsAccelerator(combo), func(_ *menu.CallbackData) {
-		go func() { _ = app.FillNativeLoginHotkey("") }()
-	})
+	if runtime.GOOS == "darwin" {
+		combo, _ := hotkeyspec.Parse(app.fillHotkeyStorage())
+		conn.AddText("Fill VPN login", wailsAccelerator(combo), func(_ *menu.CallbackData) {
+			go func() { _ = app.FillNativeLoginHotkey("") }()
+		})
+	}
 
 	return m
 }
