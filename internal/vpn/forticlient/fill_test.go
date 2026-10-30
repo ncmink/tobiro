@@ -62,8 +62,8 @@ func TestFillNativeLoginSkipsEmptyCredential(t *testing.T) {
 }
 
 func TestBuildFillScriptTypesInsteadOfSubmitting(t *testing.T) {
-	script := buildFillScript("ming", `p"ass\word`, false)
-	for _, want := range []string{`"FortiClientAgent"`, `"FortiClient"`, "keystroke thePass", "AXSecureTextField", "AXEnhancedUserInterface"} {
+	script := buildFillScript("ming", `p"ass\word`, false, 4)
+	for _, want := range []string{`"FortiClientAgent"`, `"FortiClient"`, "keystroke thePass", "AXSecureTextField", "AXEnhancedUserInterface", "bringFront"} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("fill script missing %s", want)
 		}

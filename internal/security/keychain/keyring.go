@@ -18,6 +18,9 @@ import (
 // serviceName is the entry Tobiro owns in the OS credential store.
 const serviceName = "Tobiro"
 
+// legacyServiceNames are pre-rename Keychain service labels still tried on read.
+var legacyServiceNames = []string{"biebie-access", "Biebie Access", "januz"}
+
 // Store is the OS-backed credential store.
 type Store struct {
 	mu        sync.Mutex
@@ -86,12 +89,9 @@ func (s *Store) Get(ref string) (string, error) {
 	if err := security.ValidateSecretRef(ref); err != nil {
 		return "", err
 	}
-	secret, err := keyring.Get(serviceName, ref)
+	secret, err := getFromServices(ref)
 	if err != nil {
-		if errors.Is(err, keyring.ErrNotFound) {
-			return "", domain.ErrSecretNotFound
-		}
-		return "", fmt.Errorf("read secret from %s: %w", s.Backend(), err)
+		return "", err
 	}
 	return secret, nil
 }
@@ -101,7 +101,7 @@ func (s *Store) Has(ref string) bool {
 	if err := security.ValidateSecretRef(ref); err != nil {
 		return false
 	}
-	_, err := keyring.Get(serviceName, ref)
+	_, err := getFromServices(ref)
 	return err == nil
 }
 
@@ -110,8 +110,43 @@ func (s *Store) Delete(ref string) error {
 	if err := security.ValidateSecretRef(ref); err != nil {
 		return err
 	}
-	if err := keyring.Delete(serviceName, ref); err != nil && !errors.Is(err, keyring.ErrNotFound) {
-		return fmt.Errorf("delete secret from %s: %w", s.Backend(), err)
+	var lastErr error
+	for _, svc := range allServiceNames() {
+		if err := keyring.Delete(svc, ref); err != nil {
+			if errors.Is(err, keyring.ErrNotFound) {
+				continue
+			}
+			lastErr = err
+		}
+	}
+	if lastErr != nil {
+		return fmt.Errorf("delete secret from %s: %w", s.Backend(), lastErr)
 	}
 	return nil
+}
+
+func allServiceNames() []string {
+	out := make([]string, 0, 1+len(legacyServiceNames))
+	out = append(out, serviceName)
+	out = append(out, legacyServiceNames...)
+	return out
+}
+
+func getFromServices(ref string) (string, error) {
+	var lastErr error
+	for _, svc := range allServiceNames() {
+		secret, err := keyring.Get(svc, ref)
+		if err == nil {
+			return secret, nil
+		}
+		if errors.Is(err, keyring.ErrNotFound) {
+			lastErr = domain.ErrSecretNotFound
+			continue
+		}
+		return "", fmt.Errorf("read secret from %s: %w", svc, err)
+	}
+	if lastErr != nil {
+		return "", lastErr
+	}
+	return "", domain.ErrSecretNotFound
 }

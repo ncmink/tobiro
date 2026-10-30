@@ -61,8 +61,13 @@ func isAssistiveAccessError(stderr string) bool {
 // A token prompt and the "new password" dialog are left alone. A lone secure
 // field is filled only when it is labelled as a password, so a FortiToken box
 // does not receive the VPN password.
-func buildFillScript(username, password string, probeOnly bool) string {
+//
+// One osascript run keeps scanning for waitSeconds, so the caller does not pay
+// a process launch per attempt. In probeOnly mode it only reports "ready" and
+// never takes focus or types.
+func buildFillScript(username, password string, probeOnly bool, waitSeconds int) string {
 	return fmt.Sprintf(`
+global didWake
 on labelOf(el)
 	tell application "System Events"
 		set bits to ""
@@ -137,7 +142,7 @@ on typeSecret(el, thePass)
 	end tell
 end typeSecret
 
-on tryFill(theUI, theUser, thePass, pname)
+on tryFill(theUI, theUser, thePass, pname, probeOnly)
 	set wtitle to ""
 	tell application "System Events"
 		try
@@ -283,13 +288,9 @@ on tryFill(theUI, theUser, thePass, pname)
 		if ok is false then return false
 	end if
 
-	tell application "System Events"
-		tell process pname
-			set frontmost to true
-		end tell
-	end tell
 	if probeOnly then return true
-	delay 0.12
+	if not my bringFront(pname) then return false
+	delay 0.1
 	if userField is not missing value and theUser is not "" then
 		my typeSecret(userField, theUser)
 	end if
@@ -299,53 +300,97 @@ on tryFill(theUI, theUser, thePass, pname)
 	return true
 end tryFill
 
-on run
-	set probeOnly to %t
-	set theUser to %s
-	set thePass to %s
-	set namesToTry to {"FortiClientAgent", "FortiClient"}
+-- Keystrokes go to whichever app is frontmost, so typing only starts once
+-- FortiClient is confirmed in front.
+on bringFront(pname)
 	tell application "System Events"
-		repeat with wanted in namesToTry
-			set wantedName to wanted as string
-			repeat with procRef in (every process whose background only is false)
-				set pname to (name of procRef) as string
-				if pname is wantedName then
-					-- FortiClient is Electron. Its password field stays out of the
-					-- accessibility tree until this flag is toggled, and the tree
-					-- is only readable after a short pause.
-					if pname is "FortiClient" then
-						tell procRef
-							try
-								set value of attribute "AXEnhancedUserInterface" to false
-							end try
-							delay 0.25
-							try
-								set value of attribute "AXEnhancedUserInterface" to true
-							end try
-						end tell
-						delay 1
-					end if
-					tell procRef
-						repeat with w in windows
-							if my tryFill(w, theUser, thePass, pname) then
-								if probeOnly then return "ready"
-								return "filled"
-							end if
-							try
-								repeat with sh in sheets of w
-									if my tryFill(sh, theUser, thePass, pname) then
-										if probeOnly then return "ready"
-										return "filled"
-									end if
-								end repeat
-							end try
-						end repeat
-					end tell
-				end if
-			end repeat
+		try
+			set frontmost of process pname to true
+		end try
+		repeat 30 times
+			try
+				if frontmost of process pname then return true
+			end try
+			delay 0.05
 		end repeat
 	end tell
+	return false
+end bringFront
+
+-- The login form is a web view. It is absent from the accessibility tree until
+-- this flag is on, and reading the tree while Chromium is rebuilding it hangs,
+-- so the wait happens here and the caller scans only afterwards.
+on wakeElectron(pname)
+	tell application "System Events"
+		set value of attribute "AXEnhancedUserInterface" of process pname to true
+	end tell
+	delay 0.8
+end wakeElectron
+
+on webViewHidden(pname)
+	tell application "System Events"
+		try
+			if (value of attribute "AXEnhancedUserInterface" of process pname) is true then return false
+		end try
+	end tell
+	return true
+end webViewHidden
+
+on scanProcess(pname, theUser, thePass, probeOnly)
+	tell application "System Events"
+		set wins to windows of process pname
+	end tell
+	repeat with w in wins
+		if my tryFill(w, theUser, thePass, pname, probeOnly) then return true
+		set shs to {}
+		tell application "System Events"
+			try
+				set shs to sheets of w
+			end try
+		end tell
+		repeat with sh in shs
+			if my tryFill(sh, theUser, thePass, pname, probeOnly) then return true
+		end repeat
+	end repeat
+	return false
+end scanProcess
+
+on scanOnce(theUser, thePass, probeOnly)
+	repeat with wanted in {"FortiClientAgent", "FortiClient"}
+		set pname to wanted as string
+		set isUp to false
+		tell application "System Events"
+			set isUp to (exists process pname)
+		end tell
+		if isUp then
+			-- Scan only after the web view is in the tree. Scanning during the
+			-- rebuild is what made detection run until the timeout.
+			if pname is "FortiClient" and didWake is false and my webViewHidden(pname) then
+				set didWake to true
+				my wakeElectron(pname)
+			end if
+			if my scanProcess(pname, theUser, thePass, probeOnly) then return true
+		end if
+	end repeat
+	return false
+end scanOnce
+
+on run
+	set didWake to false
+	set probeOnly to %t
+	set waitFor to %d
+	set theUser to %s
+	set thePass to %s
+	set deadline to (current date) + waitFor
+	repeat
+		if my scanOnce(theUser, thePass, probeOnly) then
+			if probeOnly then return "ready"
+			return "filled"
+		end if
+		if (current date) > deadline then exit repeat
+		delay 0.25
+	end repeat
 	return "waiting"
 end run
-`, probeOnly, quoteAppleScript(username), quoteAppleScript(password))
+`, probeOnly, waitSeconds, quoteAppleScript(username), quoteAppleScript(password))
 }

@@ -576,18 +576,27 @@ func (m *Manager) fillNativeLogin(ctx context.Context, filler LoginFiller, profi
 		defer ticker.Stop()
 
 		if canProbe {
+			var lastProbe error
 			for {
 				err := prober.ProbeNativeLogin(waitCtx, profile, credential)
 				if err == nil {
 					break
 				}
+				lastProbe = err
 				if errors.Is(err, domain.ErrAssistiveAccess) {
 					m.log.Warn("%s", err.Error())
+					m.notifyFillFailed(profile.ID, err.Error())
 					return
 				}
 				select {
 				case <-waitCtx.Done():
-					m.log.Info("Login fields were not found before timeout for credential=%s — type them in the vendor window", credential.ID)
+					reason := "Could not find the login fields in " + profile.Name + ". Leave the username and password form open, and allow Tobiro in System Settings → Privacy & Security → Accessibility."
+					if lastProbe != nil {
+						m.log.Info("%s (%v)", reason, lastProbe)
+					} else {
+						m.log.Info("%s", reason)
+					}
+					m.notifyFillFailed(profile.ID, reason)
 					return
 				case <-ticker.C:
 				}
@@ -620,13 +629,28 @@ func (m *Manager) fillNativeLogin(ctx context.Context, filler LoginFiller, profi
 			}
 			select {
 			case <-waitCtx.Done():
-				m.log.Info("Login fields were not filled before timeout for credential=%s — type them in the vendor window", credential.ID)
+				reason := "Found the " + profile.Name + " login form, but could not type into it. Allow Tobiro in System Settings → Privacy & Security → Accessibility, then try again."
+				m.log.Info("%s", reason)
+				m.notifyFillFailed(profile.ID, reason)
 				return
 			case <-ticker.C:
 			}
 		}
 	}()
 	return nil
+}
+
+// notifyFillFailed surfaces a native-login failure on the connection card.
+// The fill runs after OpenNativeClient has already returned, so this is the
+// only way the window hears about it.
+func (m *Manager) notifyFillFailed(profileID, reason string) {
+	if m.prompter == nil {
+		return
+	}
+	m.prompter.Notify(domain.EventConnectionFailed, domain.ConnectionFailedEvent{
+		ProfileID: profileID,
+		Reason:    reason,
+	})
 }
 
 // WatchAfterOpen invalidates the probe cache and polls this profile rapidly

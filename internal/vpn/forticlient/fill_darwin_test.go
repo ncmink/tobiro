@@ -14,11 +14,13 @@ func TestBuildFillScriptCompiles(t *testing.T) {
 		t.Skip("osacompile not available")
 	}
 	for _, pass := range []string{"secret", `p"ass\word`, "รหัสลับ"} {
-		script := buildFillScript("ming", pass, false)
-		cmd := exec.Command("osacompile", "-o", filepath.Join(t.TempDir(), "fill.scpt"), "-")
-		cmd.Stdin = strings.NewReader(script)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("fill AppleScript does not compile: %v\n%s", err, out)
+		for _, probe := range []bool{false, true} {
+			script := buildFillScript("ming", pass, probe, 4)
+			cmd := exec.Command("osacompile", "-o", filepath.Join(t.TempDir(), "fill.scpt"), "-")
+			cmd.Stdin = strings.NewReader(script)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("fill AppleScript (probe=%v) does not compile: %v\n%s", probe, err, out)
+			}
 		}
 	}
 }
