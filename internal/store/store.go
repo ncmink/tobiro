@@ -19,10 +19,8 @@ const (
 	appDirName   = "tobiro"
 	dataFileName = "data.json"
 
-	// schemaVer 2 added the access kind and the SSH tunnel settings. The change
-	// is additive, so a version 1 document loads by backfilling the kind every
-	// profile in it implicitly had.
-	schemaVer = 2
+	// schemaVer 3 added update check preferences.
+	schemaVer = 3
 )
 
 // Data is the on-disk document.
@@ -44,15 +42,22 @@ type Data struct {
 
 	// FillHotkeyIntroSeen suppresses the first-run fill shortcut dialog.
 	FillHotkeyIntroSeen bool `json:"fillHotkeyIntroSeen,omitempty"`
+
+	// AutoCheckUpdates enables a daily GitHub release check at startup.
+	AutoCheckUpdates bool `json:"autoCheckUpdates,omitempty"`
+
+	// LastUpdateCheckAt is when Tobiro last contacted GitHub (RFC3339).
+	LastUpdateCheckAt string `json:"lastUpdateCheckAt,omitempty"`
 }
 
 func newData() *Data {
 	return &Data{
-		SchemaVersion: schemaVer,
-		Profiles:      []domain.VPNProfile{},
-		Credentials:   []domain.Credential{},
-		Preferences:   map[string]domain.ProfilePreferences{},
-		Groups:        map[string]domain.GroupSettings{},
+		SchemaVersion:     schemaVer,
+		Profiles:          []domain.VPNProfile{},
+		Credentials:       []domain.Credential{},
+		Preferences:       map[string]domain.ProfilePreferences{},
+		Groups:            map[string]domain.GroupSettings{},
+		AutoCheckUpdates:  true,
 	}
 }
 
@@ -116,6 +121,9 @@ func Open(path string) (*Store, error) {
 	// older build or hand edit put one there.
 	for i := range loaded.Credentials {
 		loaded.Credentials[i].Secret = ""
+	}
+	if loaded.SchemaVersion < 3 {
+		loaded.AutoCheckUpdates = true
 	}
 	loaded.SchemaVersion = schemaVer
 	s.data = &loaded

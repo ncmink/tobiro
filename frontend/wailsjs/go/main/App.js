@@ -10,6 +10,10 @@ export function CancelInteraction(arg1) {
   return window['go']['main']['App']['CancelInteraction'](arg1);
 }
 
+export function CheckForUpdate() {
+  return window['go']['main']['App']['CheckForUpdate']();
+}
+
 export function ClearLogs() {
   return window['go']['main']['App']['ClearLogs']();
 }
@@ -50,6 +54,10 @@ export function FillNativeLoginHotkey(arg1) {
   return window['go']['main']['App']['FillNativeLoginHotkey'](arg1);
 }
 
+export function FrontendReady() {
+  return window['go']['main']['App']['FrontendReady']();
+}
+
 export function GetBootstrap() {
   return window['go']['main']['App']['GetBootstrap']();
 }
@@ -76,6 +84,10 @@ export function GetLogs() {
 
 export function GetNetworkDiagnosis(arg1) {
   return window['go']['main']['App']['GetNetworkDiagnosis'](arg1);
+}
+
+export function GetUpdateSettings() {
+  return window['go']['main']['App']['GetUpdateSettings']();
 }
 
 export function ImportConnections() {
@@ -122,6 +134,10 @@ export function OpenPrivacySettings(arg1) {
   return window['go']['main']['App']['OpenPrivacySettings'](arg1);
 }
 
+export function OpenUpdateURL(arg1) {
+  return window['go']['main']['App']['OpenUpdateURL'](arg1);
+}
+
 export function ProceedNativeFill(arg1) {
   return window['go']['main']['App']['ProceedNativeFill'](arg1);
 }
@@ -144,6 +160,10 @@ export function ResetFillShortcut() {
 
 export function SaveTunnel(arg1, arg2) {
   return window['go']['main']['App']['SaveTunnel'](arg1, arg2);
+}
+
+export function SetAutoCheckUpdates(arg1) {
+  return window['go']['main']['App']['SetAutoCheckUpdates'](arg1);
 }
 
 export function SetClientStartup(arg1, arg2) {

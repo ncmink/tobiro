@@ -8,6 +8,8 @@ export function AddCredential(arg1:string,arg2:domain.CredentialInput):Promise<d
 
 export function CancelInteraction(arg1:string):Promise<void>;
 
+export function CheckForUpdate():Promise<main.UpdateCheckView>;
+
 export function ClearLogs():Promise<void>;
 
 export function Connect(arg1:string,arg2:string):Promise<domain.SessionView>;
@@ -28,6 +30,8 @@ export function FillNativeLogin(arg1:string,arg2:string):Promise<void>;
 
 export function FillNativeLoginHotkey(arg1:string):Promise<void>;
 
+export function FrontendReady():Promise<void>;
+
 export function GetBootstrap():Promise<main.BootstrapView>;
 
 export function GetClientStartup(arg1:string):Promise<domain.StartupState>;
@@ -41,6 +45,8 @@ export function GetFillShortcut():Promise<main.FillShortcutView>;
 export function GetLogs():Promise<Array<logging.Entry>>;
 
 export function GetNetworkDiagnosis(arg1:string):Promise<domain.NetworkDiagnosis>;
+
+export function GetUpdateSettings():Promise<main.UpdateSettingsView>;
 
 export function ImportConnections():Promise<main.ImportResultView>;
 
@@ -64,6 +70,8 @@ export function OpenNativeClient(arg1:string,arg2:string):Promise<void>;
 
 export function OpenPrivacySettings(arg1:string):Promise<void>;
 
+export function OpenUpdateURL(arg1:string):Promise<void>;
+
 export function ProceedNativeFill(arg1:string):Promise<void>;
 
 export function ReadSSHCommand(arg1:string):Promise<domain.SSHCommand>;
@@ -75,6 +83,8 @@ export function RefreshStatus():Promise<Array<domain.SessionView>>;
 export function ResetFillShortcut():Promise<void>;
 
 export function SaveTunnel(arg1:string,arg2:domain.TunnelInput):Promise<main.ConnectionView>;
+
+export function SetAutoCheckUpdates(arg1:boolean):Promise<void>;
 
 export function SetClientStartup(arg1:string,arg2:boolean):Promise<domain.StartupState>;
 

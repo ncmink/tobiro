@@ -20,8 +20,8 @@ import (
 	"tobiro/internal/vpn"
 )
 
-// appVersion is stamped into the Settings screen.
-const appVersion = "0.0.1"
+// appVersion is stamped into the Settings screen and release checks.
+const appVersion = "1.0.1"
 
 // App is the Wails binding surface: use-case entry points only.
 //

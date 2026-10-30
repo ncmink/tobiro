@@ -130,6 +130,21 @@ type FillLoginDetectedView struct {
 	ShortcutDisplay string `json:"shortcutDisplay"`
 }
 
+// UpdateCheckView reports the result of a GitHub release check.
+type UpdateCheckView struct {
+	Current         string `json:"current"`
+	Latest          string `json:"latest"`
+	UpdateAvailable bool   `json:"updateAvailable"`
+	ReleasePage     string `json:"releasePage"`
+	DownloadURL     string `json:"downloadUrl"`
+	Message         string `json:"message"`
+}
+
+// UpdateSettingsView holds user preferences for release checks.
+type UpdateSettingsView struct {
+	AutoCheckUpdates bool `json:"autoCheckUpdates"`
+}
+
 // FillShortcutView describes the global fill-login shortcut.
 type FillShortcutView struct {
 	Supported     bool   `json:"supported"`

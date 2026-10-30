@@ -24,6 +24,19 @@ func applicationMenu(app *App) *menu.Menu {
 		})
 	}
 
+	help := m.AddSubmenu("Help")
+	help.AddText("Check for Updates…", nil, func(_ *menu.CallbackData) {
+		go func() {
+			view, err := app.CheckForUpdate()
+			if err != nil {
+				return
+			}
+			if view.UpdateAvailable {
+				app.notifyUpdateAvailable(view)
+			}
+		}()
+	})
+
 	return m
 }
 

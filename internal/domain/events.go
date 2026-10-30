@@ -31,6 +31,9 @@ const (
 	// field becomes visible, so the UI can suggest the fill shortcut.
 	EventFillLoginDetected = "fill:login_detected"
 
+	// EventUpdateAvailable is raised when a newer GitHub Release exists.
+	EventUpdateAvailable = "app:update_available"
+
 	// EventHostKeyReview asks the user to vouch for an SSH server nobody on
 	// this machine has met before. It is the one moment where accepting is a
 	// security decision rather than a convenience, so it is never answered

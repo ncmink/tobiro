@@ -935,6 +935,40 @@ export namespace main {
 	        this.exists = source["exists"];
 	    }
 	}
+	export class UpdateCheckView {
+	    current: string;
+	    latest: string;
+	    updateAvailable: boolean;
+	    releasePage: string;
+	    downloadUrl: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateCheckView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.current = source["current"];
+	        this.latest = source["latest"];
+	        this.updateAvailable = source["updateAvailable"];
+	        this.releasePage = source["releasePage"];
+	        this.downloadUrl = source["downloadUrl"];
+	        this.message = source["message"];
+	    }
+	}
+	export class UpdateSettingsView {
+	    autoCheckUpdates: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateSettingsView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.autoCheckUpdates = source["autoCheckUpdates"];
+	    }
+	}
 
 }
 
