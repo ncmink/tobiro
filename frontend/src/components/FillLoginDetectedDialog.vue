@@ -97,7 +97,11 @@ onUnmounted(clearAutoClose)
 
       <p class="text-center text-xs text-ink-faint">
         Wrong shortcut?
-        <RouterLink :to="{ name: 'settings' }" class="text-brand hover:underline" @click="close">
+        <RouterLink
+          :to="{ name: 'settings', query: { tab: 'shortcuts' } }"
+          class="text-brand hover:underline"
+          @click="close"
+        >
           Change in Settings
         </RouterLink>
         · closes in 5 seconds

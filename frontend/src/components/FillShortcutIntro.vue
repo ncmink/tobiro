@@ -84,7 +84,11 @@ async function openPane(pane: 'accessibility' | 'automation' | 'listen') {
 
       <p>
         Change the shortcut in
-        <RouterLink :to="{ name: 'settings' }" class="text-brand hover:underline" @click="close">
+        <RouterLink
+          :to="{ name: 'settings', query: { tab: 'shortcuts' } }"
+          class="text-brand hover:underline"
+          @click="close"
+        >
           Settings
         </RouterLink>
         — click the shortcut field and press your keys.

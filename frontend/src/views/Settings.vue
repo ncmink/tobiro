@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 
 import { ClearLogs, GetLogs } from '@bindings/go/main/App'
 import type { logging } from '@bindings/go/models'
@@ -10,6 +10,9 @@ import { useTheme, type ThemePreference } from '@/lib/theme'
 import { useConnectionsStore } from '@/stores/connections'
 import { comboFromKeyboardEvent, useFillShortcutStore } from '@/stores/fillShortcut'
 
+type SettingsTab = 'general' | 'shortcuts' | 'clients' | 'logs'
+
+const route = useRoute()
 const store = useConnectionsStore()
 const fillShortcut = useFillShortcutStore()
 const { preference, resolved, setTheme } = useTheme()
@@ -18,6 +21,18 @@ const themes: { value: ThemePreference; label: string; description: string }[] =
   { value: 'dark', label: 'Dark', description: 'A softer view after hours' },
   { value: 'system', label: 'System', description: 'Match your device appearance' },
 ]
+
+const allTabs: { id: SettingsTab; label: string }[] = [
+  { id: 'general', label: 'General' },
+  { id: 'shortcuts', label: 'Fill login' },
+  { id: 'clients', label: 'VPN clients' },
+  { id: 'logs', label: 'Activity log' },
+]
+
+const activeTab = ref<SettingsTab>('general')
+const visibleTabs = computed(() =>
+  allTabs.filter((tab) => tab.id !== 'shortcuts' || fillShortcut.supported),
+)
 
 const logs = ref<logging.Entry[]>([])
 const detecting = ref(false)
@@ -33,14 +48,40 @@ const LEVEL_CLASS: Record<string, string> = {
   error: 'text-bad',
 }
 
+function parseTabQuery(value: unknown): SettingsTab | null {
+  if (value === 'general' || value === 'shortcuts' || value === 'clients' || value === 'logs') {
+    return value
+  }
+  return null
+}
+
+function applyTabFromRoute() {
+  const tab = parseTabQuery(route.query.tab)
+  if (!tab) return
+  if (tab === 'shortcuts' && !fillShortcut.supported) {
+    activeTab.value = 'general'
+    return
+  }
+  activeTab.value = tab
+}
+
 onMounted(async () => {
   await fillShortcut.refresh()
   syncShortcutDraft()
+  applyTabFromRoute()
   await store.loadProviderStatus()
   logs.value = await GetLogs()
   EventsOn('log:appended', (entry: logging.Entry) => {
     logs.value = [...logs.value, entry].slice(-500)
   })
+})
+
+watch(() => route.query.tab, applyTabFromRoute)
+
+watch(visibleTabs, (tabs) => {
+  if (!tabs.some((t) => t.id === activeTab.value)) {
+    activeTab.value = 'general'
+  }
 })
 
 watch(
@@ -131,277 +172,387 @@ function capabilityList(provider: (typeof store.providerStatus)[number]) {
       </p>
     </header>
 
-    <section class="rounded-2xl border border-line bg-surface-1 p-6" aria-labelledby="appearance-heading">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 id="appearance-heading" class="text-base font-semibold text-ink">Appearance</h2>
-          <p class="mt-1 text-sm text-ink-muted">Choose how Tobiro looks on this device.</p>
-        </div>
-        <span class="rounded-full bg-brand/10 px-3 py-1 text-xs font-medium text-brand">{{ resolved === 'dark' ? 'Dark' : 'Light' }} theme active</span>
-      </div>
-      <div class="mt-5 grid gap-3 sm:grid-cols-3" role="group" aria-label="App theme">
-        <button v-for="theme in themes" :key="theme.value" type="button"
-          class="theme-option no-drag" :class="{ 'theme-option--selected': preference === theme.value }"
-          :aria-pressed="preference === theme.value" @click="setTheme(theme.value)">
-          <span class="theme-preview" :class="`theme-preview--${theme.value}`" aria-hidden="true">
-            <span class="theme-preview-bar"><i /><i /><i /></span>
-            <span class="theme-preview-content"><span /><span /><span /></span>
-          </span>
-          <span class="mt-3 flex items-center justify-between gap-2 text-sm font-semibold">
-            {{ theme.label }}
-            <span class="theme-radio" :class="{ 'theme-radio--selected': preference === theme.value }" aria-hidden="true">
-              <svg v-if="preference === theme.value" class="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 8 3 3 7-7" /></svg>
-            </span>
-          </span>
-          <span class="mt-1 block text-xs text-ink-muted">{{ theme.description }}</span>
-        </button>
-      </div>
-      <p class="mt-4 text-xs text-ink-faint">Your preference is saved automatically.</p>
-    </section>
-
-    <section
-      v-if="fillShortcut.supported"
-      class="rounded-2xl border border-line bg-surface-1 p-6"
-      aria-labelledby="fill-shortcut-heading"
+    <div
+      class="flex min-h-[min(720px,70vh)] flex-col overflow-hidden rounded-2xl border border-line bg-surface-1"
     >
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 id="fill-shortcut-heading" class="text-base font-semibold text-ink">Fill login shortcut</h2>
-          <p class="mt-1 text-sm text-ink-muted">
-            Global shortcut while a supported VPN login window is open. Default is ⌘I.
-          </p>
-        </div>
-        <kbd class="rounded-lg border border-line-strong bg-surface-0 px-3 py-1.5 font-mono text-sm text-ink">
-          {{ fillShortcut.shortcut?.display || '⌘I' }}
-        </kbd>
-      </div>
-
-      <div class="mt-5">
-        <label class="block min-w-0">
-          <span class="text-xs font-medium text-ink-muted">Shortcut</span>
-          <input
-            :value="shortcutCapturing ? '' : shortcutDraft"
-            type="text"
-            readonly
-            spellcheck="false"
-            autocapitalize="off"
-            autocomplete="off"
-            class="no-drag mt-1.5 w-full cursor-pointer rounded-xl border border-line-strong bg-surface-0 px-3 py-2 font-mono text-sm text-ink outline-none transition focus:border-brand/60 focus:ring-2 focus:ring-brand/20"
-            :class="{ 'ring-2 ring-brand/20 border-brand/60': shortcutCapturing }"
-            :placeholder="shortcutCapturing ? 'Press shortcut… (Esc to cancel)' : shortcutDraft"
-            :aria-busy="savingShortcut"
-            @focus="onShortcutFocus"
-            @blur="onShortcutBlur"
-            @keydown="onShortcutKeydown"
-          />
-        </label>
-        <p v-if="savingShortcut" class="mt-2 text-xs text-ink-muted">Saving…</p>
-      </div>
-      <p class="mt-2 text-xs text-ink-faint">
-        Click the field, then press your shortcut (for example ⌘⇧L). Use at least one modifier:
-        <span class="font-mono">cmd</span>, <span class="font-mono">ctrl</span>,
-        <span class="font-mono">option</span>, or <span class="font-mono">shift</span>.
-      </p>
-
-      <div class="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          class="no-drag rounded-xl px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
-          @click="fillShortcut.reset()"
-        >
-          Reset to ⌘I
-        </button>
-        <button
-          type="button"
-          class="no-drag rounded-xl px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
-          @click="fillShortcut.replayIntro()"
-        >
-          Show intro again
-        </button>
-      </div>
-
-      <p v-if="fillShortcut.saveError" class="mt-3 text-sm text-bad">{{ fillShortcut.saveError }}</p>
-      <p
-        v-else-if="fillShortcut.shortcut?.registerError"
-        class="mt-3 text-sm text-warn"
+      <header
+        class="relative flex shrink-0 items-center justify-center border-b border-line bg-surface-2/80 px-4 py-2.5"
       >
-        Shortcut not active: {{ fillShortcut.shortcut.registerError }}
-      </p>
-      <p v-else-if="fillShortcut.shortcut?.registered === false" class="mt-3 text-sm text-warn">
-        Shortcut is not registered. Check permissions below.
-      </p>
-
-      <div class="mt-6 border-t border-line pt-5">
-        <h3 class="text-sm font-semibold text-ink">Permissions</h3>
-        <p class="mt-1 text-xs text-ink-muted">
-          Required on macOS for the shortcut and for typing into vendor login windows.
-        </p>
-        <div class="mt-4 flex flex-wrap items-center gap-3">
-          <span
-            class="rounded-lg px-2.5 py-1 text-xs font-semibold"
+        <nav class="flex flex-wrap items-center justify-center gap-1.5" aria-label="Settings sections">
+          <button
+            v-for="tab in visibleTabs"
+            :key="tab.id"
+            type="button"
+            class="no-drag flex min-w-[4.75rem] flex-col items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-colors"
             :class="
-              fillShortcut.permissions?.accessibilityGranted
-                ? 'bg-ok/15 text-ok'
-                : 'bg-warn/15 text-warn'
+              activeTab === tab.id
+                ? 'border-brand/70 bg-surface-3 text-brand shadow-xs'
+                : 'border-transparent text-ink-muted hover:bg-surface-3/50 hover:text-ink'
             "
+            @click="activeTab = tab.id"
           >
-            Accessibility {{ fillShortcut.permissions?.accessibilityGranted ? 'granted' : 'needed' }}
-          </span>
-          <button
-            type="button"
-            class="no-drag text-xs font-medium text-brand hover:underline"
-            @click="fillShortcut.openPrivacy('accessibility')"
-          >
-            Open Accessibility settings
+            <svg
+              v-if="tab.id === 'general'"
+              viewBox="0 0 24 24"
+              class="size-5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            >
+              <path d="M4 6h16M4 12h16M4 18h16" />
+              <circle cx="9" cy="6" r="2" fill="currentColor" />
+              <circle cx="15" cy="12" r="2" fill="currentColor" />
+              <circle cx="10" cy="18" r="2" fill="currentColor" />
+            </svg>
+            <svg
+              v-else-if="tab.id === 'shortcuts'"
+              viewBox="0 0 24 24"
+              class="size-5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+              <path d="M6.5 9h1M10 9h1M13.5 9h1M17 9h1M6.5 12h1M10 12h1M13.5 12h1M17 12h1M8 15.5h8" />
+            </svg>
+            <svg
+              v-else-if="tab.id === 'clients'"
+              viewBox="0 0 24 24"
+              class="size-5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+            </svg>
+            <svg
+              v-else-if="tab.id === 'logs'"
+              viewBox="0 0 24 24"
+              class="size-5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+            </svg>
+            <span class="leading-none">{{ tab.label }}</span>
           </button>
-          <button
-            type="button"
-            class="no-drag text-xs font-medium text-brand hover:underline"
-            @click="fillShortcut.openPrivacy('automation')"
-          >
-            Open Automation settings
-          </button>
-          <button
-            type="button"
-            class="no-drag text-xs font-medium text-brand hover:underline"
-            @click="fillShortcut.openPrivacy('listen')"
-          >
-            Open Input Monitoring settings
-          </button>
-        </div>
-        <p v-if="fillShortcut.permissions?.automationHint" class="mt-3 text-xs leading-relaxed text-ink-faint">
-          {{ fillShortcut.permissions.automationHint }}
-        </p>
-        <p
-          v-if="fillShortcut.permissions?.inputMonitoringHint"
-          class="mt-2 text-xs leading-relaxed text-ink-faint"
-        >
-          {{ fillShortcut.permissions.inputMonitoringHint }}
-        </p>
-      </div>
-    </section>
-
-    <!-- Credential storage -->
-    <section class="rounded-2xl border border-line bg-surface-1 p-6">
-      <h2 class="text-base font-semibold text-ink">Password storage</h2>
-      <div class="mt-4 flex flex-wrap items-center gap-3">
-        <span
-          class="rounded-lg px-2.5 py-1 text-xs font-semibold"
-          :class="bootstrap?.secretAvailable ? 'bg-ok/15 text-ok' : 'bg-warn/15 text-warn'"
-        >
-          {{ bootstrap?.secretBackend }}
-        </span>
-        <p class="text-sm text-ink-muted">{{ bootstrap?.secretStatusText }}</p>
-      </div>
-      <p class="mt-4 text-xs leading-relaxed text-ink-faint">
-        Passwords are held only by your operating system's credential store. Application data keeps
-        a reference to each secret, never the secret itself, and passwords are never sent to the
-        user interface.
-      </p>
-      <dl class="mt-3 space-y-2 text-xs">
-        <div class="flex flex-wrap gap-x-2 gap-y-1">
-          <dt class="font-medium text-ink-muted">Keychain service</dt>
-          <dd class="font-mono text-ink-faint">Tobiro</dd>
-        </div>
-        <div v-if="bootstrap?.dataPath" class="flex flex-wrap gap-x-2 gap-y-1">
-          <dt class="shrink-0 font-medium text-ink-muted">Application data</dt>
-          <dd class="min-w-0 truncate font-mono text-ink-faint">{{ bootstrap.dataPath }}</dd>
-        </div>
-      </dl>
-    </section>
-
-    <!-- Provider detection -->
-    <section class="rounded-2xl border border-line bg-surface-1">
-      <header class="flex items-center justify-between border-b border-line px-6 py-4">
-        <div>
-          <h2 class="text-base font-semibold text-ink">VPN clients</h2>
-          <p class="mt-0.5 text-xs text-ink-muted">
-            What each installed client officially allows Tobiro to do.
-          </p>
-        </div>
-        <button
-          type="button"
-          class="no-drag rounded-xl border border-line-strong px-3.5 py-1.5 text-sm font-medium text-ink transition hover:border-brand/60 hover:text-brand disabled:opacity-50"
-          :disabled="detecting"
-          @click="redetect"
-        >
-          {{ detecting ? 'Detecting…' : 'Re-detect' }}
-        </button>
+        </nav>
       </header>
 
-      <ul class="divide-y divide-line">
-        <li v-for="provider in store.providerStatus" :key="provider.provider" class="px-6 py-5">
-          <div class="flex items-start gap-4">
-            <ProviderIcon :provider="provider.provider" size="sm" />
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <h3 class="font-medium text-ink">{{ provider.displayName }}</h3>
-                <span
-                  class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                  :class="
-                    provider.capabilities.installed
-                      ? 'bg-ok/15 text-ok'
-                      : 'bg-ink/5 text-ink-faint'
-                  "
-                >
-                  {{ provider.capabilities.installed ? 'Installed' : 'Not found' }}
-                </span>
-                <span v-if="provider.client.version" class="font-mono text-xs text-ink-faint">
-                  v{{ provider.client.version }}
-                </span>
+      <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <!-- General -->
+        <div v-if="activeTab === 'general'" class="mx-auto max-w-2xl space-y-8">
+          <section aria-labelledby="appearance-heading">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 id="appearance-heading" class="text-base font-semibold text-ink">Appearance</h2>
+                <p class="mt-1 text-sm text-ink-muted">Choose how Tobiro looks on this device.</p>
               </div>
-
-              <div class="mt-3 flex flex-wrap gap-1.5">
-                <span
-                  v-for="cap in capabilityList(provider)"
-                  :key="cap.label"
-                  class="rounded-md px-2 py-0.5 text-[11px]"
-                  :class="cap.on ? 'bg-ok/10 text-ok' : 'bg-ink/5 text-ink-faint line-through'"
-                >
-                  {{ cap.label }}
+              <span class="rounded-full bg-brand/10 px-3 py-1 text-xs font-medium text-brand">{{
+                resolved === 'dark' ? 'Dark' : 'Light'
+              }}
+                theme active</span>
+            </div>
+            <div class="mt-5 grid gap-3 sm:grid-cols-3" role="group" aria-label="App theme">
+              <button
+                v-for="theme in themes"
+                :key="theme.value"
+                type="button"
+                class="theme-option no-drag"
+                :class="{ 'theme-option--selected': preference === theme.value }"
+                :aria-pressed="preference === theme.value"
+                @click="setTheme(theme.value)"
+              >
+                <span class="theme-preview" :class="`theme-preview--${theme.value}`" aria-hidden="true">
+                  <span class="theme-preview-bar"><i /><i /><i /></span>
+                  <span class="theme-preview-content"><span /><span /><span /></span>
                 </span>
-              </div>
+                <span class="mt-3 flex items-center justify-between gap-2 text-sm font-semibold">
+                  {{ theme.label }}
+                  <span
+                    class="theme-radio"
+                    :class="{ 'theme-radio--selected': preference === theme.value }"
+                    aria-hidden="true"
+                  >
+                    <svg
+                      v-if="preference === theme.value"
+                      class="h-3 w-3"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="m3 8 3 3 7-7" />
+                    </svg>
+                  </span>
+                </span>
+                <span class="mt-1 block text-xs text-ink-muted">{{ theme.description }}</span>
+              </button>
+            </div>
+            <p class="mt-4 text-xs text-ink-faint">Your preference is saved automatically.</p>
+          </section>
 
-              <p v-if="provider.capabilities.notes" class="mt-3 text-xs leading-relaxed text-ink-muted">
-                {{ provider.capabilities.notes }}
-              </p>
-              <p v-if="provider.client.path" class="mt-2 truncate font-mono text-[11px] text-ink-faint">
-                {{ provider.client.path }}
+          <hr class="border-line" />
+
+          <section aria-labelledby="password-storage-heading">
+            <h2 id="password-storage-heading" class="text-base font-semibold text-ink">Password storage</h2>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <span
+                class="rounded-lg px-2.5 py-1 text-xs font-semibold"
+                :class="bootstrap?.secretAvailable ? 'bg-ok/15 text-ok' : 'bg-warn/15 text-warn'"
+              >
+                {{ bootstrap?.secretBackend }}
+              </span>
+              <p class="text-sm text-ink-muted">{{ bootstrap?.secretStatusText }}</p>
+            </div>
+            <p class="mt-4 text-xs leading-relaxed text-ink-faint">
+              Passwords are held only by your operating system's credential store. Application data keeps
+              a reference to each secret, never the secret itself, and passwords are never sent to the
+              user interface.
+            </p>
+            <dl class="mt-3 space-y-2 text-xs">
+              <div class="flex flex-wrap gap-x-2 gap-y-1">
+                <dt class="font-medium text-ink-muted">Keychain service</dt>
+                <dd class="font-mono text-ink-faint">Tobiro</dd>
+              </div>
+              <div v-if="bootstrap?.dataPath" class="flex flex-wrap gap-x-2 gap-y-1">
+                <dt class="shrink-0 font-medium text-ink-muted">Application data</dt>
+                <dd class="min-w-0 truncate font-mono text-ink-faint">{{ bootstrap.dataPath }}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+
+        <!-- Fill login -->
+        <section
+          v-else-if="activeTab === 'shortcuts'"
+          class="mx-auto max-w-2xl"
+          aria-labelledby="fill-shortcut-heading"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 id="fill-shortcut-heading" class="text-base font-semibold text-ink">Fill login shortcut</h2>
+              <p class="mt-1 text-sm text-ink-muted">
+                Global shortcut while a supported VPN login window is open. Default is ⌘I.
               </p>
             </div>
+            <kbd class="rounded-lg border border-line-strong bg-surface-0 px-3 py-1.5 font-mono text-sm text-ink">
+              {{ fillShortcut.shortcut?.display || '⌘I' }}
+            </kbd>
           </div>
-        </li>
-      </ul>
-    </section>
 
-    <!-- Activity log -->
-    <section class="rounded-2xl border border-line bg-surface-1">
-      <header class="flex items-center justify-between border-b border-line px-6 py-4">
-        <div>
-          <h2 class="text-base font-semibold text-ink">Activity log</h2>
-          <p class="mt-0.5 text-xs text-ink-muted">
-            Passwords and one-time codes are redacted before anything is written here.
+          <div class="mt-5">
+            <label class="block min-w-0">
+              <span class="text-xs font-medium text-ink-muted">Shortcut</span>
+              <input
+                :value="shortcutCapturing ? '' : shortcutDraft"
+                type="text"
+                readonly
+                spellcheck="false"
+                autocapitalize="off"
+                autocomplete="off"
+                class="no-drag mt-1.5 w-full cursor-pointer rounded-xl border border-line-strong bg-surface-0 px-3 py-2 font-mono text-sm text-ink outline-none transition focus:border-brand/60 focus:ring-2 focus:ring-brand/20"
+                :class="{ 'ring-2 ring-brand/20 border-brand/60': shortcutCapturing }"
+                :placeholder="shortcutCapturing ? 'Press shortcut… (Esc to cancel)' : shortcutDraft"
+                :aria-busy="savingShortcut"
+                @focus="onShortcutFocus"
+                @blur="onShortcutBlur"
+                @keydown="onShortcutKeydown"
+              />
+            </label>
+            <p v-if="savingShortcut" class="mt-2 text-xs text-ink-muted">Saving…</p>
+          </div>
+          <p class="mt-2 text-xs text-ink-faint">
+            Click the field, then press your shortcut (for example ⌘⇧L). Use at least one modifier:
+            <span class="font-mono">cmd</span>, <span class="font-mono">ctrl</span>,
+            <span class="font-mono">option</span>, or <span class="font-mono">shift</span>.
           </p>
-        </div>
-        <button
-          type="button"
-          class="no-drag rounded-xl px-3.5 py-1.5 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
-          @click="clearLogs"
-        >
-          Clear
-        </button>
-      </header>
 
-      <div class="max-h-80 overflow-y-auto px-6 py-4">
-        <p v-if="!logs.length" class="py-6 text-center text-sm text-ink-muted">Nothing logged yet.</p>
-        <ol v-else class="space-y-1.5 font-mono text-xs">
-          <li v-for="(entry, index) in logs" :key="index" class="flex gap-3">
-            <span class="shrink-0 text-ink-faint">{{ timeOf(entry.time) }}</span>
-            <span :class="LEVEL_CLASS[entry.level] ?? 'text-ink-muted'">{{ entry.message }}</span>
-          </li>
-        </ol>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="no-drag rounded-xl px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
+              @click="fillShortcut.reset()"
+            >
+              Reset to ⌘I
+            </button>
+            <button
+              type="button"
+              class="no-drag rounded-xl px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
+              @click="fillShortcut.replayIntro()"
+            >
+              Show intro again
+            </button>
+          </div>
+
+          <p v-if="fillShortcut.saveError" class="mt-3 text-sm text-bad">{{ fillShortcut.saveError }}</p>
+          <p v-else-if="fillShortcut.shortcut?.registerError" class="mt-3 text-sm text-warn">
+            Shortcut not active: {{ fillShortcut.shortcut.registerError }}
+          </p>
+          <p v-else-if="fillShortcut.shortcut?.registered === false" class="mt-3 text-sm text-warn">
+            Shortcut is not registered. Check permissions below.
+          </p>
+
+          <div class="mt-8 border-t border-line pt-6">
+            <h3 class="text-sm font-semibold text-ink">Permissions</h3>
+            <p class="mt-1 text-xs text-ink-muted">
+              Required on macOS for the shortcut and for typing into vendor login windows.
+            </p>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <span
+                class="rounded-lg px-2.5 py-1 text-xs font-semibold"
+                :class="
+                  fillShortcut.permissions?.accessibilityGranted
+                    ? 'bg-ok/15 text-ok'
+                    : 'bg-warn/15 text-warn'
+                "
+              >
+                Accessibility {{ fillShortcut.permissions?.accessibilityGranted ? 'granted' : 'needed' }}
+              </span>
+              <button
+                type="button"
+                class="no-drag text-xs font-medium text-brand hover:underline"
+                @click="fillShortcut.openPrivacy('accessibility')"
+              >
+                Open Accessibility settings
+              </button>
+              <button
+                type="button"
+                class="no-drag text-xs font-medium text-brand hover:underline"
+                @click="fillShortcut.openPrivacy('automation')"
+              >
+                Open Automation settings
+              </button>
+              <button
+                type="button"
+                class="no-drag text-xs font-medium text-brand hover:underline"
+                @click="fillShortcut.openPrivacy('listen')"
+              >
+                Open Input Monitoring settings
+              </button>
+            </div>
+            <p
+              v-if="fillShortcut.permissions?.automationHint"
+              class="mt-3 text-xs leading-relaxed text-ink-faint"
+            >
+              {{ fillShortcut.permissions.automationHint }}
+            </p>
+            <p
+              v-if="fillShortcut.permissions?.inputMonitoringHint"
+              class="mt-2 text-xs leading-relaxed text-ink-faint"
+            >
+              {{ fillShortcut.permissions.inputMonitoringHint }}
+            </p>
+          </div>
+        </section>
+
+        <!-- VPN clients -->
+        <section v-else-if="activeTab === 'clients'" class="mx-auto max-w-3xl">
+          <header class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-base font-semibold text-ink">VPN clients</h2>
+              <p class="mt-0.5 text-xs text-ink-muted">
+                What each installed client officially allows Tobiro to do.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="no-drag rounded-xl border border-line-strong px-3.5 py-1.5 text-sm font-medium text-ink transition hover:border-brand/60 hover:text-brand disabled:opacity-50"
+              :disabled="detecting"
+              @click="redetect"
+            >
+              {{ detecting ? 'Detecting…' : 'Re-detect' }}
+            </button>
+          </header>
+
+          <ul class="mt-6 divide-y divide-line rounded-xl border border-line">
+            <li v-for="provider in store.providerStatus" :key="provider.provider" class="px-5 py-5">
+              <div class="flex items-start gap-4">
+                <ProviderIcon :provider="provider.provider" size="sm" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="font-medium text-ink">{{ provider.displayName }}</h3>
+                    <span
+                      class="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                      :class="
+                        provider.capabilities.installed
+                          ? 'bg-ok/15 text-ok'
+                          : 'bg-ink/5 text-ink-faint'
+                      "
+                    >
+                      {{ provider.capabilities.installed ? 'Installed' : 'Not found' }}
+                    </span>
+                    <span v-if="provider.client.version" class="font-mono text-xs text-ink-faint">
+                      v{{ provider.client.version }}
+                    </span>
+                  </div>
+
+                  <div class="mt-3 flex flex-wrap gap-1.5">
+                    <span
+                      v-for="cap in capabilityList(provider)"
+                      :key="cap.label"
+                      class="rounded-md px-2 py-0.5 text-[11px]"
+                      :class="cap.on ? 'bg-ok/10 text-ok' : 'bg-ink/5 text-ink-faint line-through'"
+                    >
+                      {{ cap.label }}
+                    </span>
+                  </div>
+
+                  <p
+                    v-if="provider.capabilities.notes"
+                    class="mt-3 text-xs leading-relaxed text-ink-muted"
+                  >
+                    {{ provider.capabilities.notes }}
+                  </p>
+                  <p v-if="provider.client.path" class="mt-2 truncate font-mono text-[11px] text-ink-faint">
+                    {{ provider.client.path }}
+                  </p>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Activity log -->
+        <section v-else-if="activeTab === 'logs'" class="mx-auto max-w-3xl">
+          <header class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-base font-semibold text-ink">Activity log</h2>
+              <p class="mt-0.5 text-xs text-ink-muted">
+                Passwords and one-time codes are redacted before anything is written here.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="no-drag rounded-xl px-3.5 py-1.5 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
+              @click="clearLogs"
+            >
+              Clear
+            </button>
+          </header>
+
+          <div
+            class="mt-6 max-h-[min(420px,50vh)] overflow-y-auto rounded-xl border border-line px-5 py-4"
+          >
+            <p v-if="!logs.length" class="py-6 text-center text-sm text-ink-muted">Nothing logged yet.</p>
+            <ol v-else class="space-y-1.5 font-mono text-xs">
+              <li v-for="(entry, index) in logs" :key="index" class="flex gap-3">
+                <span class="shrink-0 text-ink-faint">{{ timeOf(entry.time) }}</span>
+                <span :class="LEVEL_CLASS[entry.level] ?? 'text-ink-muted'">{{ entry.message }}</span>
+              </li>
+            </ol>
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
   </div>
 </template>
 
