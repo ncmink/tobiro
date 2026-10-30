@@ -50,12 +50,25 @@ type SecureCredentialStore interface {
 
 var refSegmentPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 
+// secretRefPrefixes lists the first path segment allowed in a stored reference.
+// Legacy prefixes remain valid for reading secrets saved before the Tobiro rename.
+var secretRefPrefixes = map[string]struct{}{
+	"tobiro":        {},
+	"biebie-access": {},
+	"januz":         {},
+}
+
 // BuildSecretRef composes the reference persisted alongside a credential.
 //
 // The reference is derived from UUIDs only — never from a username, which is
 // not unique and can change.
 func BuildSecretRef(profileID, credentialID string) string {
 	return fmt.Sprintf("tobiro/%s/%s", profileID, credentialID)
+}
+
+// LegacySecretRef builds the pre-Tobiro keychain account name for a credential.
+func LegacySecretRef(prefix, profileID, credentialID string) string {
+	return fmt.Sprintf("%s/%s/%s", prefix, profileID, credentialID)
 }
 
 // ValidateSecretRef guards against a malformed reference reaching the OS store.
@@ -67,9 +80,7 @@ func ValidateSecretRef(ref string) error {
 	if len(parts) != 3 {
 		return fmt.Errorf("secret reference %q has an unexpected shape", ref)
 	}
-	switch parts[0] {
-	case "tobiro":
-	default:
+	if _, ok := secretRefPrefixes[parts[0]]; !ok {
 		return fmt.Errorf("secret reference %q has an unexpected shape", ref)
 	}
 	for _, part := range parts[1:] {

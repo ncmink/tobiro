@@ -37,7 +37,7 @@ func (s *Service) ListForProfile(profileID string) []domain.CredentialView {
 	creds := s.rawForProfile(profileID)
 	out := make([]domain.CredentialView, 0, len(creds))
 	for _, c := range creds {
-		out = append(out, c.View(s.secrets.Has(c.SecretRef)))
+		out = append(out, c.View(s.hasStoredSecret(c)))
 	}
 	return out
 }
@@ -223,6 +223,7 @@ func (s *Service) Update(id string, in domain.CredentialInput) (domain.Credentia
 		d.Credentials[idx].IsDefault = in.IsDefault
 		d.Credentials[idx].PrivateKeyPath = strings.TrimSpace(in.PrivateKeyPath)
 		d.Credentials[idx].UpdatedAt = time.Now()
+		d.Credentials[idx].SecretRef = security.BuildSecretRef(d.Credentials[idx].ProfileID, d.Credentials[idx].ID)
 		updated = d.Credentials[idx]
 		return nil
 	})
@@ -237,13 +238,13 @@ func (s *Service) Update(id string, in domain.CredentialInput) (domain.Credentia
 		}
 		if err := s.secrets.Set(updated.SecretRef, write); err != nil {
 			s.log.Error("Could not update password for credential=%s: %v", id, err)
-			return updated.View(s.secrets.Has(updated.SecretRef)),
+			return updated.View(s.hasStoredSecret(updated)),
 				fmt.Errorf("credential saved, but storing the password failed: %w", err)
 		}
 	}
 
 	s.log.Info("Updated credential=%s label=%q", updated.ID, updated.Label)
-	return updated.View(s.secrets.Has(updated.SecretRef)), nil
+	return updated.View(s.hasStoredSecret(updated)), nil
 }
 
 // Delete removes a credential and its stored secret.
@@ -286,8 +287,10 @@ func (s *Service) Delete(id string) error {
 		return err
 	}
 
-	if err := s.secrets.Delete(removed.SecretRef); err != nil {
-		s.log.Warn("Removed credential=%s but its stored password could not be deleted: %v", id, err)
+	for _, ref := range s.secretRefCandidates(removed) {
+		if err := s.secrets.Delete(ref); err != nil {
+			s.log.Warn("Removed credential=%s but stored password at %q could not be deleted: %v", id, ref, err)
+		}
 	}
 	s.log.Info("Deleted credential=%s from profile=%s", id, removed.ProfileID)
 	return nil
@@ -313,8 +316,10 @@ func (s *Service) DeleteForProfile(profileID string) error {
 		return err
 	}
 	for _, c := range removed {
-		if err := s.secrets.Delete(c.SecretRef); err != nil {
-			s.log.Warn("Could not delete stored password for credential=%s: %v", c.ID, err)
+		for _, ref := range s.secretRefCandidates(c) {
+			if err := s.secrets.Delete(ref); err != nil {
+				s.log.Warn("Could not delete stored password for credential=%s at %q: %v", c.ID, ref, err)
+			}
 		}
 	}
 	return nil
@@ -352,14 +357,14 @@ func (s *Service) Resolve(credentialID string) (domain.Credential, error) {
 		// would refuse a credential that works. Attach it when it exists and
 		// let the key itself decide whether it was needed.
 		if cred.AuthMethod == domain.AuthSSHKey {
-			if secret, err := s.secrets.Get(cred.SecretRef); err == nil {
+			if secret, err := s.getStoredSecret(cred); err == nil {
 				cred.Secret = secret
 			}
 		}
 		return cred, nil
 	}
 
-	secret, err := s.secrets.Get(cred.SecretRef)
+	secret, err := s.getStoredSecret(cred)
 	if err != nil {
 		if errors.Is(err, domain.ErrSecretNotFound) || errors.Is(err, security.ErrSecretMissing) {
 			return domain.Credential{}, fmt.Errorf(
@@ -378,7 +383,60 @@ func (s *Service) HasSecret(credentialID string) bool {
 	if err != nil {
 		return false
 	}
-	return s.secrets.Has(cred.SecretRef)
+	return s.hasStoredSecret(cred)
+}
+
+func (s *Service) hasStoredSecret(c domain.Credential) bool {
+	for _, ref := range s.secretRefCandidates(c) {
+		if s.secrets.Has(ref) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) getStoredSecret(c domain.Credential) (string, error) {
+	var lastErr error
+	for _, ref := range s.secretRefCandidates(c) {
+		secret, err := s.secrets.Get(ref)
+		if err == nil {
+			return secret, nil
+		}
+		if errors.Is(err, domain.ErrSecretNotFound) {
+			lastErr = err
+			continue
+		}
+		return "", err
+	}
+	if lastErr != nil {
+		return "", lastErr
+	}
+	return "", domain.ErrSecretNotFound
+}
+
+// secretRefCandidates lists keychain account names to try, canonical first.
+func (s *Service) secretRefCandidates(c domain.Credential) []string {
+	canon := security.BuildSecretRef(c.ProfileID, c.ID)
+	seen := make(map[string]struct{}, 4)
+	out := make([]string, 0, 4)
+	add := func(ref string) {
+		if ref == "" {
+			return
+		}
+		if err := security.ValidateSecretRef(ref); err != nil {
+			return
+		}
+		if _, ok := seen[ref]; ok {
+			return
+		}
+		seen[ref] = struct{}{}
+		out = append(out, ref)
+	}
+	add(canon)
+	add(c.SecretRef)
+	add(security.LegacySecretRef("biebie-access", c.ProfileID, c.ID))
+	add(security.LegacySecretRef("januz", c.ProfileID, c.ID))
+	return out
 }
 
 // SelectDefault picks which credential to preselect: the last one used, else
