@@ -100,6 +100,7 @@ onUnmounted(clearAutoClose)
         <RouterLink :to="{ name: 'settings' }" class="text-brand hover:underline" @click="close">
           Change in Settings
         </RouterLink>
+        · closes in 5 seconds
       </p>
     </div>
 
