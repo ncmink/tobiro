@@ -145,7 +145,7 @@ Application data holds only a reference derived from UUIDs:
 credential:
   id: 5f3a1c9e-…
   username: ming
-  secretRef: biebie-access/<profileId>/<credentialId>
+  secretRef: tobiro/<profileId>/<credentialId>
 ```
 
 The frontend receives a `CredentialView`, which has no password field at all:
@@ -437,12 +437,12 @@ Logs look like this, and are asserted on in tests:
 ## Repository layout
 
 ```text
-biebie-access/
+tobiro/
 ├── main.go                     composition root — wires services, registers adapters
 ├── app.go                      Wails binding surface: use-case APIs only
 ├── bridge.go                   UI event bridge + OTP prompter
 ├── views.go                    frontend-facing view types
-├── service_peer.go             the local endpoint and biebie-access:// links
+├── service_peer.go             the local endpoint and tobiro:// links
 │
 ├── internal/
 │   ├── domain/                 models, state machine, capabilities, validation
@@ -484,7 +484,7 @@ Business rules live in `internal/`. `app.go` only delegates.
 ## Talking to Biebie Kube
 
 Tobiro answers the Biebie Context Protocol on a socket owned by the
-logged-in user, and registers `biebie-access://`. The contract itself is a
+logged-in user, and registers `tobiro://`. The contract itself is a
 sibling checkout, `biebie-protocol/`, shared with Biebie Kube through a
 `replace` directive — so changing the wire format breaks the build in both
 applications rather than leaving a mismatch to be found at runtime.
@@ -535,7 +535,7 @@ go -C ../biebie-kube run ./cmd/access-smoke <profile-id>
 
 Settings → Appearance offers Light, Dark, and System themes. Changes apply
 immediately across connections, details, forms, and menus. The preference is
-saved on this device under `biebie-access.theme`; System follows changes to the
+saved on this device under `tobiro.theme`; System follows changes to the
 operating system appearance and is the default when no preference is saved.
 
 The application uses the purple Biebie mascot consistently in its header,
@@ -553,7 +553,7 @@ go test ./...  # domain, credential identity, secret-leakage and flow tests
 ```
 
 Application data lives at the path shown in Settings — on macOS,
-`~/Library/Application Support/biebie-access/data.json`.
+`~/Library/Application Support/tobiro/data.json`.
 
 ### Checking an adapter against a real client
 

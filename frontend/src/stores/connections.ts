@@ -37,13 +37,12 @@ import { errorMessage } from '@/lib/state'
  */
 /** Whether hidden groups are currently revealed. A view preference, not data. */
 const showHiddenKey = 'tobiro.show-hidden-groups'
-const legacyShowHiddenKeys = ['biebie-access.show-hidden-groups', 'januz.show-hidden-groups']
 /** Parent connection IDs whose nested SSH tunnels / dependents are collapsed on the dashboard. */
 const collapsedChildrenKey = 'tobiro.collapsed-children'
 
 function readShowHidden(): boolean {
   try {
-    for (const key of [showHiddenKey, ...legacyShowHiddenKeys]) {
+    for (const key of [showHiddenKey]) {
       if (localStorage.getItem(key) === '1') {
         if (key !== showHiddenKey) {
           localStorage.setItem(showHiddenKey, '1')

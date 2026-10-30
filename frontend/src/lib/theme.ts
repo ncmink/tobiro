@@ -3,13 +3,12 @@ import { WindowSetBackgroundColour } from '@bindings/runtime/runtime'
 
 export type ThemePreference = 'system' | 'dark' | 'light'
 const storageKey = 'tobiro.theme'
-const legacyStorageKeys = ['biebie-access.theme', 'januz.theme']
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
 const systemDark = ref(systemTheme.matches)
 
 function savedPreference(): ThemePreference {
   try {
-    for (const key of [storageKey, ...legacyStorageKeys]) {
+    for (const key of [storageKey]) {
       const value = localStorage.getItem(key)
       if (value === 'dark' || value === 'light' || value === 'system') {
         if (key !== storageKey) {

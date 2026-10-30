@@ -25,8 +25,6 @@ const (
 	schemaVer = 2
 )
 
-var legacyAppDirNames = []string{"biebie-access", "januz"}
-
 // Data is the on-disk document.
 type Data struct {
 	SchemaVersion int                                  `json:"schemaVersion"`
@@ -65,70 +63,8 @@ func DefaultPath() (string, error) {
 	return filepath.Join(dir, appDirName, dataFileName), nil
 }
 
-// migrateLegacyData copies data.json from a previous app support folder when
-// Tobiro has not written one yet.
-func migrateLegacyData(destPath string) error {
-	if _, err := os.Stat(destPath); err == nil {
-		return nil
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("stat data file: %w", err)
-	}
-
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return nil
-	}
-	for _, legacy := range legacyAppDirNames {
-		if legacy == appDirName {
-			continue
-		}
-		src := filepath.Join(dir, legacy, dataFileName)
-		raw, err := os.ReadFile(src)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return fmt.Errorf("read legacy data %s: %w", src, err)
-		}
-		if len(raw) == 0 {
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(destPath), 0o700); err != nil {
-			return fmt.Errorf("create data directory: %w", err)
-		}
-		tmp, err := os.CreateTemp(filepath.Dir(destPath), ".data-migrate-*.json")
-		if err != nil {
-			return fmt.Errorf("create temp file: %w", err)
-		}
-		tmpName := tmp.Name()
-		if _, err := tmp.Write(raw); err != nil {
-			tmp.Close()
-			os.Remove(tmpName)
-			return fmt.Errorf("write migrated data: %w", err)
-		}
-		if err := tmp.Chmod(0o600); err != nil {
-			tmp.Close()
-			os.Remove(tmpName)
-			return fmt.Errorf("chmod migrated data: %w", err)
-		}
-		if err := tmp.Close(); err != nil {
-			os.Remove(tmpName)
-			return fmt.Errorf("close migrated data: %w", err)
-		}
-		if err := os.Rename(tmpName, destPath); err != nil {
-			os.Remove(tmpName)
-			return fmt.Errorf("install migrated data: %w", err)
-		}
-		return nil
-	}
-	return nil
-}
-
 // Open loads the store at path, creating an empty document if absent.
 func Open(path string) (*Store, error) {
-	if err := migrateLegacyData(path); err != nil {
-		return nil, err
-	}
 	s := &Store{path: path, data: newData()}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, fmt.Errorf("create data directory: %w", err)

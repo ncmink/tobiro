@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -285,10 +286,11 @@ func call(t *testing.T, h *harness, method ipc.Method, request any, result any) 
 // identifier it landed on is how the caller stops using the name.
 func TestConnectingByNameReportsTheIdentifierItResolvedTo(t *testing.T) {
 	h := newHarness(t)
-	p := h.addProfile(t, "vpn-cat")
+	name := "vpn-cat-" + strings.ReplaceAll(t.Name(), "/", "_")
+	p := h.addProfile(t, name)
 
 	var result bctx.AccessConnectResult
-	call(t, h, ipc.MethodAccessConnect, params{ProfileID: "VPN-CAT"}, &result)
+	call(t, h, ipc.MethodAccessConnect, params{ProfileID: strings.ToUpper(name)}, &result)
 
 	if !result.Accepted {
 		t.Fatal("a connect request naming a known connection must be accepted")
@@ -309,10 +311,11 @@ func TestConnectingByNameReportsTheIdentifierItResolvedTo(t *testing.T) {
 
 func TestStatusAnswersForAConnectionName(t *testing.T) {
 	h := newHarness(t)
-	h.addProfile(t, "vpn-cat")
+	name := "vpn-cat-" + strings.ReplaceAll(t.Name(), "/", "_")
+	h.addProfile(t, name)
 
 	var status bctx.AccessStatus
-	call(t, h, ipc.MethodAccessStatus, params{ProfileID: "vpn-cat"}, &status)
+	call(t, h, ipc.MethodAccessStatus, params{ProfileID: name}, &status)
 
 	// Resolving by name must not report the "unknown" state a genuinely absent
 	// connection gets, or the card would stay grey while connecting worked.

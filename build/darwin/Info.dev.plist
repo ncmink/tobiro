@@ -7,11 +7,8 @@
         <string>{{.Info.ProductName}}</string>
         <key>CFBundleExecutable</key>
         <string>{{.OutputFilename}}</string>
-        <!-- Must match Info.plist: a development build that registered a
-             different identifier would claim biebie-access:// for itself and
-             keep answering deep links after it was replaced. -->
         <key>CFBundleIdentifier</key>
-        <string>net.biebie.access</string>
+        <string>net.tobiro.access</string>
         <key>CFBundleVersion</key>
         <string>{{.Info.ProductVersion}}</string>
         <key>CFBundleGetInfoString</key>
@@ -51,7 +48,7 @@
           {{range .Info.Protocols}}
             <dict>
                 <key>CFBundleURLName</key>
-                <string>net.biebie.{{.Scheme}}</string>
+                <string>net.tobiro.{{.Scheme}}</string>
                 <key>CFBundleURLSchemes</key>
                 <array>
                     <string>{{.Scheme}}</string>

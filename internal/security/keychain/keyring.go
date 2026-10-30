@@ -18,8 +18,6 @@ import (
 // serviceName is the entry Tobiro owns in the OS credential store.
 const serviceName = "Tobiro"
 
-var legacyServiceNames = []string{"JANUZ", "Tobiro"}
-
 // Store is the OS-backed credential store.
 type Store struct {
 	mu        sync.Mutex
@@ -83,32 +81,12 @@ func (s *Store) Set(ref string, write security.SecretWrite) error {
 	return nil
 }
 
-func getWithLegacy(ref string) (string, error) {
-	secret, err := keyring.Get(serviceName, ref)
-	if err == nil {
-		return secret, nil
-	}
-	if !errors.Is(err, keyring.ErrNotFound) {
-		return "", err
-	}
-	for _, legacy := range legacyServiceNames {
-		secret, err = keyring.Get(legacy, ref)
-		if err == nil {
-			return secret, nil
-		}
-		if !errors.Is(err, keyring.ErrNotFound) {
-			return "", err
-		}
-	}
-	return "", keyring.ErrNotFound
-}
-
 // Get returns the secret for ref.
 func (s *Store) Get(ref string) (string, error) {
 	if err := security.ValidateSecretRef(ref); err != nil {
 		return "", err
 	}
-	secret, err := getWithLegacy(ref)
+	secret, err := keyring.Get(serviceName, ref)
 	if err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
 			return "", domain.ErrSecretNotFound
@@ -123,7 +101,7 @@ func (s *Store) Has(ref string) bool {
 	if err := security.ValidateSecretRef(ref); err != nil {
 		return false
 	}
-	_, err := getWithLegacy(ref)
+	_, err := keyring.Get(serviceName, ref)
 	return err == nil
 }
 
@@ -132,15 +110,8 @@ func (s *Store) Delete(ref string) error {
 	if err := security.ValidateSecretRef(ref); err != nil {
 		return err
 	}
-	if err := keyring.Delete(serviceName, ref); err != nil {
-		if !errors.Is(err, keyring.ErrNotFound) {
-			return fmt.Errorf("delete secret from %s: %w", s.Backend(), err)
-		}
-	}
-	for _, legacy := range legacyServiceNames {
-		if err := keyring.Delete(legacy, ref); err != nil && !errors.Is(err, keyring.ErrNotFound) {
-			return fmt.Errorf("delete legacy secret from %s: %w", legacy, err)
-		}
+	if err := keyring.Delete(serviceName, ref); err != nil && !errors.Is(err, keyring.ErrNotFound) {
+		return fmt.Errorf("delete secret from %s: %w", s.Backend(), err)
 	}
 	return nil
 }

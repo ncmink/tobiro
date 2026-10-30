@@ -218,6 +218,7 @@ func (s *Server) handleProfiles(ctx context.Context, _ json.RawMessage) (any, er
 			Name:     p.Name,
 			Group:    p.Group,
 			Provider: p.Provider.DisplayName(),
+			Kind:     string(p.AccessKind()),
 			State:    state,
 		})
 	}

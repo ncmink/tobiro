@@ -7,12 +7,8 @@
         <string>{{.Info.ProductName}}</string>
         <key>CFBundleExecutable</key>
         <string>{{.OutputFilename}}</string>
-        <!-- Spelled out rather than derived from the project name, because the
-             bundle identifier is what macOS matches a registered URL scheme
-             against: deriving it would let a rename silently unregister
-             biebie-access:// and break the handoff from Biebie Kube. -->
         <key>CFBundleIdentifier</key>
-        <string>net.biebie.access</string>
+        <string>net.tobiro.access</string>
         <key>CFBundleVersion</key>
         <string>{{.Info.ProductVersion}}</string>
         <key>CFBundleGetInfoString</key>
@@ -52,7 +48,7 @@
           {{range .Info.Protocols}}
             <dict>
                 <key>CFBundleURLName</key>
-                <string>net.biebie.{{.Scheme}}</string>
+                <string>net.tobiro.{{.Scheme}}</string>
                 <key>CFBundleURLSchemes</key>
                 <array>
                     <string>{{.Scheme}}</string>

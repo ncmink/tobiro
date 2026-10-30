@@ -68,7 +68,7 @@ func ValidateSecretRef(ref string) error {
 		return fmt.Errorf("secret reference %q has an unexpected shape", ref)
 	}
 	switch parts[0] {
-	case "tobiro", "biebie-access", "januz":
+	case "tobiro":
 	default:
 		return fmt.Errorf("secret reference %q has an unexpected shape", ref)
 	}
