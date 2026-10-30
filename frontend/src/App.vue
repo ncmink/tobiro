@@ -5,6 +5,7 @@ import { RouterView, useRouter } from 'vue-router'
 import { TakeConnectRequest } from '@bindings/go/main/App'
 import { Environment, EventsOn } from '@bindings/runtime/runtime'
 import HostKeyDialog from '@/components/HostKeyDialog.vue'
+import FillCountdownDialog from '@/components/FillCountdownDialog.vue'
 import OtpDialog from '@/components/OtpDialog.vue'
 import { useConnectionSharing } from '@/lib/connectionSharing'
 import { coerceSession } from '@/lib/state'
@@ -88,5 +89,6 @@ onUnmounted(() => {
 
     <OtpDialog v-if="sessions.otpRequest" />
     <HostKeyDialog v-if="sessions.hostKeyRequest" />
+    <FillCountdownDialog />
   </div>
 </template>

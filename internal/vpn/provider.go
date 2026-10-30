@@ -51,6 +51,12 @@ type LoginFiller interface {
 	FillNativeLogin(ctx context.Context, profile domain.VPNProfile, credential domain.Credential) error
 }
 
+// NativeLoginProber is implemented on macOS by adapters that can detect vendor
+// login fields before typing. A nil error means the fields are ready to fill.
+type NativeLoginProber interface {
+	ProbeNativeLogin(ctx context.Context, profile domain.VPNProfile, credential domain.Credential) error
+}
+
 // StartupController is implemented by adapters that can stop (or restore) the
 // vendor GUI launching when the user logs in. Implementations must not disable
 // privileged tunnel helpers — only the login/tray agent.
@@ -83,6 +89,7 @@ type NetworkDoctor interface {
 // and never logged.
 type Prompter interface {
 	RequestOTP(ctx context.Context, req domain.InteractionRequest) (string, error)
+	AwaitNativeFill(ctx context.Context, req domain.NativeFillRequest) error
 	Notify(event string, payload any)
 }
 

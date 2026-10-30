@@ -471,7 +471,6 @@ func (m *Manager) OpenNativeClient(ctx context.Context, profileID, credentialID 
 			if err := m.fillNativeLogin(ctx, filler, profile, credential); err != nil {
 				return err
 			}
-			_ = m.profiles.RememberCredential(profileID, credential.ID)
 		}
 	}
 
@@ -567,40 +566,63 @@ func canFillLogin(credential domain.Credential) bool {
 
 func (m *Manager) fillNativeLogin(ctx context.Context, filler LoginFiller, profile domain.VPNProfile, credential domain.Credential) error {
 	release := m.log.Protect(credential.Secret)
-	first := filler.FillNativeLogin(ctx, profile, credential)
-	if first == nil {
-		release()
-		m.log.Info("Filled login fields in the native client for credential=%s", credential.ID)
-		return nil
-	}
-	if errors.Is(first, domain.ErrAssistiveAccess) {
-		release()
-		return first
-	}
+	prober, canProbe := filler.(NativeLoginProber)
 
-	// The login popup often appears after the user picks a gateway. Keep the
-	// secret in memory only until that window shows, or until the wait ends.
 	go func() {
 		defer release()
 		waitCtx, cancel := context.WithTimeout(ctx, burstDuration)
 		defer cancel()
 		ticker := time.NewTicker(burstInterval)
 		defer ticker.Stop()
-		for {
-			select {
-			case <-waitCtx.Done():
-				m.log.Info("Login fields were not filled before timeout for credential=%s — type them in the vendor window", credential.ID)
-				return
-			case <-ticker.C:
-				err := filler.FillNativeLogin(waitCtx, profile, credential)
+
+		if canProbe {
+			for {
+				err := prober.ProbeNativeLogin(waitCtx, profile, credential)
 				if err == nil {
-					m.log.Info("Filled login fields in the native client for credential=%s", credential.ID)
-					return
+					break
 				}
 				if errors.Is(err, domain.ErrAssistiveAccess) {
 					m.log.Warn("%s", err.Error())
 					return
 				}
+				select {
+				case <-waitCtx.Done():
+					m.log.Info("Login fields were not found before timeout for credential=%s — type them in the vendor window", credential.ID)
+					return
+				case <-ticker.C:
+				}
+			}
+		}
+
+		if canProbe && m.prompter != nil {
+			if err := m.prompter.AwaitNativeFill(waitCtx, domain.NativeFillRequest{
+				ProfileID:   profile.ID,
+				ProfileName: profile.Name,
+				HasPassword: credential.Secret != "",
+			}); err != nil {
+				if errors.Is(err, domain.ErrInteractionCancelled) {
+					m.log.Info("Login fill cancelled for credential=%s", credential.ID)
+				}
+				return
+			}
+		}
+
+		for {
+			err := filler.FillNativeLogin(waitCtx, profile, credential)
+			if err == nil {
+				m.log.Info("Filled login fields in the native client for credential=%s", credential.ID)
+				_ = m.profiles.RememberCredential(profile.ID, credential.ID)
+				return
+			}
+			if errors.Is(err, domain.ErrAssistiveAccess) {
+				m.log.Warn("%s", err.Error())
+				return
+			}
+			select {
+			case <-waitCtx.Done():
+				m.log.Info("Login fields were not filled before timeout for credential=%s — type them in the vendor window", credential.ID)
+				return
+			case <-ticker.C:
 			}
 		}
 	}()

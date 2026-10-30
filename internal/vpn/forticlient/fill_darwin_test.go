@@ -14,7 +14,7 @@ func TestBuildFillScriptCompiles(t *testing.T) {
 		t.Skip("osacompile not available")
 	}
 	for _, pass := range []string{"secret", `p"ass\word`, "รหัสลับ"} {
-		script := buildFillScript("ming", pass)
+		script := buildFillScript("ming", pass, false)
 		cmd := exec.Command("osacompile", "-o", filepath.Join(t.TempDir(), "fill.scpt"), "-")
 		cmd.Stdin = strings.NewReader(script)
 		if out, err := cmd.CombinedOutput(); err != nil {

@@ -98,6 +98,10 @@ export function OpenNativeClient(arg1, arg2) {
   return window['go']['main']['App']['OpenNativeClient'](arg1, arg2);
 }
 
+export function ProceedNativeFill(arg1) {
+  return window['go']['main']['App']['ProceedNativeFill'](arg1);
+}
+
 export function ReadSSHCommand(arg1) {
   return window['go']['main']['App']['ReadSSHCommand'](arg1);
 }

@@ -52,6 +52,8 @@ export function OpenInKube(arg1:main.OpenKubeInput):Promise<main.OpenKubeResultV
 
 export function OpenNativeClient(arg1:string,arg2:string):Promise<void>;
 
+export function ProceedNativeFill(arg1:string):Promise<void>;
+
 export function ReadSSHCommand(arg1:string):Promise<domain.SSHCommand>;
 
 export function RefreshProviderDetection():Promise<Array<domain.ProviderStatusView>>;

@@ -19,6 +19,11 @@ const (
 	EventAuthenticationRequired = "auth:required"
 	EventOTPRequired            = "auth:otp_required"
 
+	// EventNativeFillPending is raised after the vendor login fields are visible
+	// and before Tobiro types into them, so the user can cancel or wait out a
+	// short countdown.
+	EventNativeFillPending = "auth:native_fill_pending"
+
 	// EventHostKeyReview asks the user to vouch for an SSH server nobody on
 	// this machine has met before. It is the one moment where accepting is a
 	// security decision rather than a convenience, so it is never answered

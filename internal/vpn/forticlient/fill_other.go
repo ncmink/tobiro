@@ -13,3 +13,8 @@ import (
 func (p *Provider) FillNativeLogin(_ context.Context, _ domain.VPNProfile, _ domain.Credential) error {
 	return nil
 }
+
+// ProbeNativeLogin is a no-op off macOS.
+func (p *Provider) ProbeNativeLogin(_ context.Context, _ domain.VPNProfile, _ domain.Credential) error {
+	return nil
+}

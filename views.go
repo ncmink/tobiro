@@ -105,6 +105,16 @@ type OpenKubeResultView struct {
 	Launched bool `json:"launched,omitempty"`
 }
 
+// NativeFillPendingView is pushed after vendor login fields are detected and
+// before Tobiro types into them.
+type NativeFillPendingView struct {
+	RequestID       string `json:"requestId"`
+	ProfileID       string `json:"profileId"`
+	ConnectionName  string `json:"connectionName"`
+	HasPassword     bool   `json:"hasPassword"`
+	CountdownSeconds int   `json:"countdownSeconds"`
+}
+
 // OTPRequestView is pushed to the UI when authentication pauses for a code.
 type OTPRequestView struct {
 	RequestID string `json:"requestId"`

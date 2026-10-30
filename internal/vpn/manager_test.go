@@ -63,6 +63,10 @@ func (p *otpPrompter) RequestOTP(_ context.Context, req domain.InteractionReques
 	return p.code, nil
 }
 
+func (p *otpPrompter) AwaitNativeFill(_ context.Context, _ domain.NativeFillRequest) error {
+	return nil
+}
+
 func (p *otpPrompter) Notify(string, any) {}
 
 func newHarness(t *testing.T) *harness {

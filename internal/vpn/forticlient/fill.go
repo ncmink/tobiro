@@ -61,7 +61,7 @@ func isAssistiveAccessError(stderr string) bool {
 // A token prompt and the "new password" dialog are left alone. A lone secure
 // field is filled only when it is labelled as a password, so a FortiToken box
 // does not receive the VPN password.
-func buildFillScript(username, password string) string {
+func buildFillScript(username, password string, probeOnly bool) string {
 	return fmt.Sprintf(`
 on labelOf(el)
 	tell application "System Events"
@@ -288,6 +288,7 @@ on tryFill(theUI, theUser, thePass, pname)
 			set frontmost to true
 		end tell
 	end tell
+	if probeOnly then return true
 	delay 0.12
 	if userField is not missing value and theUser is not "" then
 		my typeSecret(userField, theUser)
@@ -299,6 +300,7 @@ on tryFill(theUI, theUser, thePass, pname)
 end tryFill
 
 on run
+	set probeOnly to %t
 	set theUser to %s
 	set thePass to %s
 	set namesToTry to {"FortiClientAgent", "FortiClient"}
@@ -325,10 +327,16 @@ on run
 					end if
 					tell procRef
 						repeat with w in windows
-							if my tryFill(w, theUser, thePass, pname) then return "filled"
+							if my tryFill(w, theUser, thePass, pname) then
+								if probeOnly then return "ready"
+								return "filled"
+							end if
 							try
 								repeat with sh in sheets of w
-									if my tryFill(sh, theUser, thePass, pname) then return "filled"
+									if my tryFill(sh, theUser, thePass, pname) then
+										if probeOnly then return "ready"
+										return "filled"
+									end if
 								end repeat
 							end try
 						end repeat
@@ -339,5 +347,5 @@ on run
 	end tell
 	return "waiting"
 end run
-`, quoteAppleScript(username), quoteAppleScript(password))
+`, probeOnly, quoteAppleScript(username), quoteAppleScript(password))
 }

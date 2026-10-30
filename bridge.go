@@ -83,6 +83,8 @@ func (b *uiBridge) requestConnect(profileID string) {
 	b.Notify(domain.EventConnectRequested, ConnectRequestView{ProfileID: profileID})
 }
 
+const nativeFillCountdownSeconds = 5
+
 // RequestOTP asks the UI for a one-time code and blocks until the user answers,
 // cancels, or the connect context is cancelled.
 func (b *uiBridge) RequestOTP(ctx context.Context, req domain.InteractionRequest) (string, error) {
@@ -101,6 +103,28 @@ func (b *uiBridge) RequestOTP(ctx context.Context, req domain.InteractionRequest
 		return "", err
 	}
 	return answer.code, nil
+}
+
+// AwaitNativeFill blocks until the user proceeds with login fill, cancels, or
+// the connect context ends.
+func (b *uiBridge) AwaitNativeFill(ctx context.Context, req domain.NativeFillRequest) error {
+	requestID, answers, release := b.await()
+	defer release()
+
+	b.present()
+	b.Notify(domain.EventNativeFillPending, NativeFillPendingView{
+		RequestID:          requestID,
+		ProfileID:          req.ProfileID,
+		ConnectionName:     req.ProfileName,
+		HasPassword:        req.HasPassword,
+		CountdownSeconds:   nativeFillCountdownSeconds,
+	})
+
+	_, err := wait(ctx, answers)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // ConfirmHostKey asks the user to vouch for an SSH server this machine has not
@@ -159,6 +183,22 @@ func wait(ctx context.Context, answers chan promptAnswer) (promptAnswer, error) 
 			return promptAnswer{}, domain.ErrInteractionCancelled
 		}
 		return answer, nil
+	}
+}
+
+// proceedInteraction delivers a proceed signal from the UI to a waiting prompt.
+func (b *uiBridge) proceedInteraction(requestID string) error {
+	b.pendingMu.Lock()
+	ch, ok := b.pending[requestID]
+	b.pendingMu.Unlock()
+	if !ok {
+		return fmt.Errorf("this prompt is no longer waiting for an answer")
+	}
+	select {
+	case ch <- promptAnswer{}:
+		return nil
+	default:
+		return fmt.Errorf("this prompt already received an answer")
 	}
 }
 

@@ -387,6 +387,11 @@ func (a *App) CancelInteraction(requestID string) error {
 	return a.bridge.cancelInteraction(requestID)
 }
 
+// ProceedNativeFill tells a pending native-login countdown to continue typing.
+func (a *App) ProceedNativeFill(requestID string) error {
+	return a.bridge.proceedInteraction(requestID)
+}
+
 // ----------------------------------------------------------------- providers
 
 // ListProviderStatus reports detection and capabilities for every adapter.

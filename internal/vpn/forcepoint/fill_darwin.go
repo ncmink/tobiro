@@ -51,12 +51,44 @@ func (p *Provider) FillNativeLogin(ctx context.Context, _ domain.VPNProfile, cre
 	}
 }
 
-func runFillScript(ctx context.Context, username, password string) (stdout, stderr string, err error) {
+// ProbeNativeLogin reports whether Forcepoint's login fields are on screen.
+func (p *Provider) ProbeNativeLogin(ctx context.Context, _ domain.VPNProfile, credential domain.Credential) error {
+	if !canFill(credential) {
+		return errFillWaiting
+	}
+	if err := validateFillValue("username", credential.Username); err != nil {
+		return err
+	}
+	if err := validateFillValue("password", credential.Secret); err != nil {
+		return err
+	}
+
+	result, stderr, err := runProbeScript(ctx, credential.Username, credential.Secret)
+	if err != nil {
+		if isAssistiveAccessError(stderr + err.Error()) {
+			return domain.ErrAssistiveAccess
+		}
+		return errFillWaiting
+	}
+	switch strings.TrimSpace(result) {
+	case "ready":
+		return nil
+	case "waiting":
+		return errFillWaiting
+	default:
+		if isAssistiveAccessError(stderr) {
+			return domain.ErrAssistiveAccess
+		}
+		return errFillWaiting
+	}
+}
+
+func runProbeScript(ctx context.Context, username, password string) (stdout, stderr string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, fillAttemptTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, osascriptPath, "-")
-	cmd.Stdin = strings.NewReader(buildFillScript(username, password))
+	cmd.Stdin = strings.NewReader(buildFillScript(username, password, true))
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf
@@ -64,9 +96,22 @@ func runFillScript(ctx context.Context, username, password string) (stdout, stde
 	return out.String(), errBuf.String(), err
 }
 
-func buildFillScript(username, password string) string {
+func runFillScript(ctx context.Context, username, password string) (stdout, stderr string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, fillAttemptTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, osascriptPath, "-")
+	cmd.Stdin = strings.NewReader(buildFillScript(username, password, false))
+	var out, errBuf bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errBuf
+	err = cmd.Run()
+	return out.String(), errBuf.String(), err
+}
+
+func buildFillScript(username, password string, probeOnly bool) string {
 	return fmt.Sprintf(`
-on tryFill(theUI, theUser, thePass)
+on tryFill(theUI, theUser, thePass, probeOnly)
 	tell application "System Events"
 		try
 			set textFields to UI elements of theUI whose role is "AXTextField"
@@ -74,6 +119,7 @@ on tryFill(theUI, theUser, thePass)
 			set nText to count of textFields
 			set nSecure to count of secureFields
 			if nText >= 1 and nSecure >= 1 then
+				if probeOnly then return true
 				if theUser is not "" then set value of item 1 of textFields to theUser
 				if thePass is not "" then
 					try
@@ -88,15 +134,18 @@ on tryFill(theUI, theUser, thePass)
 				return true
 			end if
 			if nText >= 2 then
+				if probeOnly then return true
 				if theUser is not "" then set value of item 1 of textFields to theUser
 				if thePass is not "" then set value of item 2 of textFields to thePass
 				return true
 			end if
 			if nText >= 1 and theUser is not "" and thePass is "" then
+				if probeOnly then return true
 				set value of item 1 of textFields to theUser
 				return true
 			end if
 			if nSecure >= 1 and thePass is not "" and theUser is "" then
+				if probeOnly then return true
 				try
 					set value of item 1 of secureFields to thePass
 				end try
@@ -113,6 +162,7 @@ on tryFill(theUI, theUser, thePass)
 end tryFill
 
 on run
+	set probeOnly to %t
 	set theUser to %s
 	set thePass to %s
 	tell application "System Events"
@@ -121,16 +171,19 @@ on run
 			if pname contains "Forcepoint" or pname contains "Stonesoft" or pname contains "Sgvpn" or pname contains "sgvpn" then
 				tell procRef
 					repeat with w in windows
-						if my tryFill(w, theUser, thePass) then
+						if my tryFill(w, theUser, thePass, probeOnly) then
+							if probeOnly then return "ready"
 							return "filled"
 						end if
 						repeat with g in groups of w
-							if my tryFill(g, theUser, thePass) then
+							if my tryFill(g, theUser, thePass, probeOnly) then
+								if probeOnly then return "ready"
 								return "filled"
 							end if
 						end repeat
 						repeat with sh in sheets of w
-							if my tryFill(sh, theUser, thePass) then
+							if my tryFill(sh, theUser, thePass, probeOnly) then
+								if probeOnly then return "ready"
 								return "filled"
 							end if
 						end repeat
@@ -141,5 +194,5 @@ on run
 	end tell
 	return "waiting"
 end run
-`, quoteAppleScript(username), quoteAppleScript(password))
+`, probeOnly, quoteAppleScript(username), quoteAppleScript(password))
 }
