@@ -9,18 +9,22 @@ import (
 	"testing"
 )
 
-func TestBuildFillScriptCompiles(t *testing.T) {
+func TestFortiClientFillScriptCompiles(t *testing.T) {
 	if _, err := exec.LookPath("osacompile"); err != nil {
 		t.Skip("osacompile not available")
 	}
-	for _, pass := range []string{"secret", `p"ass\word`, "รหัสลับ"} {
-		for _, probe := range []bool{false, true} {
-			script := buildFillScript("ming", pass, probe, 4)
-			cmd := exec.Command("osacompile", "-o", filepath.Join(t.TempDir(), "fill.scpt"), "-")
-			cmd.Stdin = strings.NewReader(script)
-			if out, err := cmd.CombinedOutput(); err != nil {
-				t.Fatalf("fill AppleScript (probe=%v) does not compile: %v\n%s", probe, err, out)
-			}
+	script := buildFillScript("ming", `p"ass\word`, 8)
+	for _, banned := range []string{"keystroke return", "key code 36"} {
+		if strings.Contains(script, banned) {
+			t.Fatalf("fill script must not contain %q", banned)
 		}
+	}
+	if strings.Contains(script, `p"ass\word`) {
+		t.Fatal("password must be encoded, not embedded raw")
+	}
+	cmd := exec.Command("osacompile", "-o", filepath.Join(t.TempDir(), "fill.scpt"), "-")
+	cmd.Stdin = strings.NewReader(script)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("FortiClient fill script does not compile: %v\n%s", err, out)
 	}
 }

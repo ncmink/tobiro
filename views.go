@@ -115,6 +115,12 @@ type NativeFillPendingView struct {
 	CountdownSeconds int   `json:"countdownSeconds"`
 }
 
+// FillLoginResultView is pushed after ⌘I fill succeeds or fails.
+type FillLoginResultView struct {
+	OK      bool   `json:"ok"`
+	Message string `json:"message"`
+}
+
 // OTPRequestView is pushed to the UI when authentication pauses for a code.
 type OTPRequestView struct {
 	RequestID string `json:"requestId"`

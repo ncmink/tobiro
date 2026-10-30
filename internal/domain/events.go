@@ -24,6 +24,9 @@ const (
 	// short countdown.
 	EventNativeFillPending = "auth:native_fill_pending"
 
+	// EventFillLoginResult reports the outcome of a ⌘I fill attempt for a toast.
+	EventFillLoginResult = "fill:login_result"
+
 	// EventHostKeyReview asks the user to vouch for an SSH server nobody on
 	// this machine has met before. It is the one moment where accepting is a
 	// security decision rather than a convenience, so it is never answered

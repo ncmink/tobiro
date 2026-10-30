@@ -8,6 +8,7 @@ import ForwardList from '@/components/ForwardList.vue'
 import ProviderIcon from '@/components/ProviderIcon.vue'
 import { descendants, type ChainNode } from '@/lib/chain'
 import { canConnect, formatDuration, isActive, stateStyle } from '@/lib/state'
+import { canFillNativeLogin } from '@/lib/nativeFill'
 import { useConnectionsStore } from '@/stores/connections'
 import { useSessionsStore } from '@/stores/sessions'
 
@@ -136,11 +137,14 @@ const manualClient = computed(() =>
 )
 const manualHint = computed(() => {
   if (!manualClient.value) return ''
-  if (props.connection.profile.provider === 'forcepoint') return 'Open Forcepoint, then click Connect in its window.'
-  if (props.connection.profile.provider === 'forticlient') {
-    return props.connection.credentials.length > 0
-      ? 'Open FortiClient. The saved password is typed in — click Connect there.'
-      : 'Open FortiClient, then click Connect there. Save an account here to fill the password — FortiClient blocks paste.'
+  if (canFillNativeLogin(props.connection)) {
+    if (props.connection.profile.provider === 'forcepoint') {
+      return 'Open Forcepoint, click Connect, click the login field, then press ⌘I — Tobiro fills username and password.'
+    }
+    return 'Open the client login window, then press ⌘I — Tobiro fills username and password.'
+  }
+  if (props.connection.profile.provider === 'forcepoint') {
+    return 'Open Forcepoint, then click Connect in its window.'
   }
   return 'Finish connecting in the client window.'
 })

@@ -69,6 +69,7 @@ func main() {
 			UniqueId:               "net.tobiro.access",
 			OnSecondInstanceLaunch: app.handleSecondInstance,
 		},
+		Menu: applicationMenu(app),
 		Bind: []interface{}{app},
 	})
 	if err != nil {

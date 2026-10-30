@@ -107,6 +107,7 @@ func (a *App) startPeerNotifier() {
 // one would sit waiting on a listener nobody is reading, instead of falling
 // back to the deep link that would have launched this application.
 func (a *App) shutdown(context.Context) {
+	a.stopFillHotkey()
 	if a.peer != nil {
 		_ = a.peer.Close()
 	}

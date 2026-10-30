@@ -72,5 +72,8 @@ export function useConnectionSharing() {
     exportConnections,
     importConnections,
     dismissNotice,
+    showFillLoginNotice(text: string, ok: boolean) {
+      announce(text, ok ? 'ok' : 'bad')
+    },
   }
 }

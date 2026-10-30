@@ -38,6 +38,14 @@ export function ExportConnections() {
   return window['go']['main']['App']['ExportConnections']();
 }
 
+export function FillNativeLogin(arg1, arg2) {
+  return window['go']['main']['App']['FillNativeLogin'](arg1, arg2);
+}
+
+export function FillNativeLoginHotkey(arg1) {
+  return window['go']['main']['App']['FillNativeLoginHotkey'](arg1);
+}
+
 export function GetBootstrap() {
   return window['go']['main']['App']['GetBootstrap']();
 }
@@ -128,6 +136,10 @@ export function SetDefaultCredential(arg1) {
 
 export function SetGroupHidden(arg1, arg2) {
   return window['go']['main']['App']['SetGroupHidden'](arg1, arg2);
+}
+
+export function SetNativeFillProfile(arg1) {
+  return window['go']['main']['App']['SetNativeFillProfile'](arg1);
 }
 
 export function SubmitOTP(arg1, arg2) {

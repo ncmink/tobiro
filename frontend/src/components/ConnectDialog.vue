@@ -14,14 +14,14 @@ const emit = defineEmits<{ close: [], connect: [credentialId: string] }>()
 const fill = computed(() => props.mode === 'fill')
 
 const title = computed(() =>
-  fill.value ? `Open ${props.connection.profile.name}` : `Connect to ${props.connection.profile.name}`,
+  fill.value ? `Fill login — ${props.connection.profile.name}` : `Connect to ${props.connection.profile.name}`,
 )
 const subtitle = computed(() =>
   fill.value
-    ? 'Choose which account to fill into the vendor login prompt. You still click Connect there.'
+    ? 'Choose the account to type. Click in the vendor username field first, then confirm — Tobiro switches back to the client and fills.'
     : 'Choose which account to sign in with.',
 )
-const actionLabel = computed(() => (fill.value ? 'Open and fill' : 'Connect'))
+const actionLabel = computed(() => (fill.value ? 'Fill login' : 'Connect'))
 
 // Preselect the last account used on this profile, falling back to the
 // profile default. Both are tracked by credential UUID, never by username.

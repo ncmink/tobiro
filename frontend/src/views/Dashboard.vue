@@ -43,7 +43,6 @@ const addForm = ref<InstanceType<typeof ConnectionForm> | null>(null)
 const editTarget = ref<main.ConnectionView | null>(null)
 const editForm = ref<InstanceType<typeof ConnectionForm> | null>(null)
 const connectTarget = ref<main.ConnectionView | null>(null)
-const fillTarget = ref<main.ConnectionView | null>(null)
 const menu = ref<{ x: number; y: number; connection: main.ConnectionView } | null>(null)
 const groupError = ref('')
 /** Where the last connection went, when it went somewhere out of sight. */
@@ -393,25 +392,10 @@ async function confirmConnect(credentialId: string) {
   await store.refresh()
 }
 
-/** Open the vendor GUI, filling login fields when an account is chosen. */
+/** Open the vendor GUI; click a login field in the client, then press ⌘I to fill. */
 function requestOpenNative(connection: main.ConnectionView) {
   sessions.clearError(connection.profile.id)
-  if (connection.credentials.length === 0) {
-    void sessions.openNativeClient(connection.profile.id, '')
-    return
-  }
-  if (connection.credentials.length === 1) {
-    void sessions.openNativeClient(connection.profile.id, connection.credentials[0].id)
-    return
-  }
-  fillTarget.value = connection
-}
-
-async function confirmFill(credentialId: string) {
-  const target = fillTarget.value
-  fillTarget.value = null
-  if (!target) return
-  await sessions.openNativeClient(target.profile.id, credentialId)
+  void sessions.openNativeClient(connection.profile.id, '')
 }
 </script>
 
@@ -769,13 +753,6 @@ async function confirmFill(credentialId: string) {
       :connection="connectTarget"
       @close="connectTarget = null"
       @connect="confirmConnect"
-    />
-    <ConnectDialog
-      v-if="fillTarget"
-      mode="fill"
-      :connection="fillTarget"
-      @close="fillTarget = null"
-      @connect="confirmFill"
     />
 
     <DisconnectChainDialog

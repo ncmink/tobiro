@@ -7,22 +7,6 @@ import (
 	"tobiro/internal/domain"
 )
 
-func TestQuoteAppleScript(t *testing.T) {
-	cases := []struct {
-		in, want string
-	}{
-		{`ming`, `character id {109, 105, 110, 103}`},
-		{`say "hi"`, `character id {115, 97, 121, 32, 34, 104, 105, 34}`},
-		{`a\b`, `character id {97, 92, 98}`},
-		{"", `""`},
-	}
-	for _, tc := range cases {
-		if got := quoteAppleScript(tc.in); got != tc.want {
-			t.Fatalf("quoteAppleScript(%q) = %s, want %s", tc.in, got, tc.want)
-		}
-	}
-}
-
 func TestCanFill(t *testing.T) {
 	if canFill(domain.Credential{}) {
 		t.Fatal("empty credential should not fill")
@@ -32,24 +16,6 @@ func TestCanFill(t *testing.T) {
 	}
 	if !canFill(domain.Credential{Secret: "secret"}) {
 		t.Fatal("password-only should fill")
-	}
-}
-
-func TestIsAssistiveAccessError(t *testing.T) {
-	if !isAssistiveAccessError("System Events got an error: osascript is not allowed assistive access.") {
-		t.Fatal("expected assistive-access detection")
-	}
-	if isAssistiveAccessError("execution error: Can’t get window 1") {
-		t.Fatal("missing window is not an access denial")
-	}
-}
-
-func TestValidateFillValueRejectsControlChars(t *testing.T) {
-	if err := validateFillValue("username", "ok"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := validateFillValue("password", "line\nbreak"); err == nil {
-		t.Fatal("expected newline in password to be rejected")
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"tobiro/internal/domain"
+	"tobiro/internal/vpn/nativefill"
 )
 
 const (
@@ -19,81 +20,44 @@ const (
 )
 
 // FillNativeLogin types the stored username and password into Forcepoint's
-// login window. It never clicks Connect.
+// login window. Forcepoint's fields are direct children of the window or a
+// group, not a focused accessibility element, so this does not depend on
+// which field the user clicked before pressing ⌘I.
 func (p *Provider) FillNativeLogin(ctx context.Context, _ domain.VPNProfile, credential domain.Credential) error {
 	if !canFill(credential) {
 		return nil
 	}
-	if err := validateFillValue("username", credential.Username); err != nil {
+	if err := nativefill.ValidateFillValue("username", credential.Username); err != nil {
 		return err
 	}
-	if err := validateFillValue("password", credential.Secret); err != nil {
+	if err := nativefill.ValidateFillValue("password", credential.Secret); err != nil {
 		return err
 	}
 
 	result, stderr, err := runFillScript(ctx, credential.Username, credential.Secret)
 	if err != nil {
-		if isAssistiveAccessError(stderr + err.Error()) {
+		if nativefill.IsAssistiveAccessError(stderr + err.Error()) {
 			return domain.ErrAssistiveAccess
 		}
-		return errFillWaiting
+		return fmt.Errorf("%w: %s", errFillWaiting, strings.TrimSpace(stderr+" "+err.Error()))
 	}
 	switch strings.TrimSpace(result) {
 	case "filled":
 		return nil
-	case "waiting":
-		return errFillWaiting
 	default:
-		if isAssistiveAccessError(stderr) {
+		if nativefill.IsAssistiveAccessError(stderr) {
 			return domain.ErrAssistiveAccess
 		}
 		return errFillWaiting
 	}
 }
 
-// ProbeNativeLogin reports whether Forcepoint's login fields are on screen.
-func (p *Provider) ProbeNativeLogin(ctx context.Context, _ domain.VPNProfile, credential domain.Credential) error {
+// ProbeNativeLogin is unused by Tobiro; fill is manual via ⌘I.
+func (p *Provider) ProbeNativeLogin(_ context.Context, _ domain.VPNProfile, credential domain.Credential) error {
 	if !canFill(credential) {
 		return errFillWaiting
 	}
-	if err := validateFillValue("username", credential.Username); err != nil {
-		return err
-	}
-	if err := validateFillValue("password", credential.Secret); err != nil {
-		return err
-	}
-
-	result, stderr, err := runProbeScript(ctx, credential.Username, credential.Secret)
-	if err != nil {
-		if isAssistiveAccessError(stderr + err.Error()) {
-			return domain.ErrAssistiveAccess
-		}
-		return errFillWaiting
-	}
-	switch strings.TrimSpace(result) {
-	case "ready":
-		return nil
-	case "waiting":
-		return errFillWaiting
-	default:
-		if isAssistiveAccessError(stderr) {
-			return domain.ErrAssistiveAccess
-		}
-		return errFillWaiting
-	}
-}
-
-func runProbeScript(ctx context.Context, username, password string) (stdout, stderr string, err error) {
-	ctx, cancel := context.WithTimeout(ctx, fillAttemptTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, osascriptPath, "-")
-	cmd.Stdin = strings.NewReader(buildFillScript(username, password, true))
-	var out, errBuf bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errBuf
-	err = cmd.Run()
-	return out.String(), errBuf.String(), err
+	return errFillWaiting
 }
 
 func runFillScript(ctx context.Context, username, password string) (stdout, stderr string, err error) {
@@ -101,7 +65,7 @@ func runFillScript(ctx context.Context, username, password string) (stdout, stde
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, osascriptPath, "-")
-	cmd.Stdin = strings.NewReader(buildFillScript(username, password, false))
+	cmd.Stdin = strings.NewReader(buildFillScript(username, password))
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf
@@ -109,9 +73,11 @@ func runFillScript(ctx context.Context, username, password string) (stdout, stde
 	return out.String(), errBuf.String(), err
 }
 
-func buildFillScript(username, password string, probeOnly bool) string {
+// buildFillScript is the scan that previously filled Forcepoint: username via
+// AX value, password via keystroke because the secure field ignores set value.
+func buildFillScript(username, password string) string {
 	return fmt.Sprintf(`
-on tryFill(theUI, theUser, thePass, probeOnly)
+on tryFill(theUI, theUser, thePass)
 	tell application "System Events"
 		try
 			set textFields to UI elements of theUI whose role is "AXTextField"
@@ -119,12 +85,8 @@ on tryFill(theUI, theUser, thePass, probeOnly)
 			set nText to count of textFields
 			set nSecure to count of secureFields
 			if nText >= 1 and nSecure >= 1 then
-				if probeOnly then return true
 				if theUser is not "" then set value of item 1 of textFields to theUser
 				if thePass is not "" then
-					try
-						set value of item 1 of secureFields to thePass
-					end try
 					set focused of item 1 of secureFields to true
 					delay 0.05
 					keystroke "a" using command down
@@ -134,21 +96,15 @@ on tryFill(theUI, theUser, thePass, probeOnly)
 				return true
 			end if
 			if nText >= 2 then
-				if probeOnly then return true
 				if theUser is not "" then set value of item 1 of textFields to theUser
 				if thePass is not "" then set value of item 2 of textFields to thePass
 				return true
 			end if
 			if nText >= 1 and theUser is not "" and thePass is "" then
-				if probeOnly then return true
 				set value of item 1 of textFields to theUser
 				return true
 			end if
 			if nSecure >= 1 and thePass is not "" and theUser is "" then
-				if probeOnly then return true
-				try
-					set value of item 1 of secureFields to thePass
-				end try
 				set focused of item 1 of secureFields to true
 				delay 0.05
 				keystroke "a" using command down
@@ -162,30 +118,23 @@ on tryFill(theUI, theUser, thePass, probeOnly)
 end tryFill
 
 on run
-	set probeOnly to %t
 	set theUser to %s
 	set thePass to %s
 	tell application "System Events"
 		repeat with procRef in (every process whose background only is false)
 			set pname to (name of procRef) as string
 			if pname contains "Forcepoint" or pname contains "Stonesoft" or pname contains "Sgvpn" or pname contains "sgvpn" then
+				try
+					set frontmost of procRef to true
+				end try
 				tell procRef
 					repeat with w in windows
-						if my tryFill(w, theUser, thePass, probeOnly) then
-							if probeOnly then return "ready"
-							return "filled"
-						end if
+						if my tryFill(w, theUser, thePass) then return "filled"
 						repeat with g in groups of w
-							if my tryFill(g, theUser, thePass, probeOnly) then
-								if probeOnly then return "ready"
-								return "filled"
-							end if
+							if my tryFill(g, theUser, thePass) then return "filled"
 						end repeat
 						repeat with sh in sheets of w
-							if my tryFill(sh, theUser, thePass, probeOnly) then
-								if probeOnly then return "ready"
-								return "filled"
-							end if
+							if my tryFill(sh, theUser, thePass) then return "filled"
 						end repeat
 					end repeat
 				end tell
@@ -194,5 +143,5 @@ on run
 	end tell
 	return "waiting"
 end run
-`, probeOnly, quoteAppleScript(username), quoteAppleScript(password))
+`, nativefill.QuoteAppleScript(username), nativefill.QuoteAppleScript(password))
 }

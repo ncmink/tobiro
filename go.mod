@@ -7,6 +7,7 @@ require (
 	github.com/ncmink/biebie-protocol v0.0.0-00010101000000-000000000000
 	github.com/wailsapp/wails/v2 v2.15.0
 	github.com/zalando/go-keyring v0.2.8
+	golang.design/x/hotkey v0.6.4
 	golang.org/x/crypto v0.53.0
 	gopkg.in/yaml.v3 v3.0.1
 )

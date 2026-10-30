@@ -39,7 +39,6 @@ const credentialForm = ref<InstanceType<typeof CredentialForm> | null>(null)
 const editingCredential = ref<domain.CredentialView | null>(null)
 const showCredentialForm = ref(false)
 const showConnectDialog = ref(false)
-const showFillDialog = ref(false)
 const pendingDisconnect = ref(false)
 
 // fromPeer explains why this page appeared on its own, for the cases where no
@@ -223,20 +222,7 @@ async function confirmConnect(credentialId: string) {
 
 function requestOpenNative(target: main.ConnectionView) {
   sessions.clearError(props.id)
-  if (target.credentials.length === 0) {
-    void sessions.openNativeClient(props.id, '')
-    return
-  }
-  if (target.credentials.length === 1) {
-    void sessions.openNativeClient(props.id, target.credentials[0].id)
-    return
-  }
-  showFillDialog.value = true
-}
-
-async function confirmFill(credentialId: string) {
-  showFillDialog.value = false
-  await sessions.openNativeClient(props.id, credentialId)
+  void sessions.openNativeClient(props.id, '')
 }
 
 async function loadStartup() {
@@ -299,6 +285,7 @@ watch(() => props.id, () => {
   showCredentialForm.value = false
   showDeleteDialog.value = false
   pageError.value = ''
+  void sessions.rememberNativeFillProfile(props.id)
   void loadStartup()
   void loadDiagnosis()
 })
@@ -420,6 +407,12 @@ onUnmounted(() => {
           >
             {{ capabilities.nativeClientLabel || (connection.profile.provider === 'forcepoint' ? 'Open Forcepoint' : 'Open client') }}
           </button>
+          <p
+            v-if="capabilities?.canFillNativeLogin"
+            class="w-full text-xs text-ink-muted"
+          >
+            Open the vendor login window, then press ⌘I — Tobiro fills username and password.
+          </p>
           <button
             type="button"
             class="no-drag rounded-xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40"
@@ -758,13 +751,6 @@ onUnmounted(() => {
       :connection="connection"
       @close="showConnectDialog = false"
       @connect="confirmConnect"
-    />
-    <ConnectDialog
-      v-if="showFillDialog"
-      mode="fill"
-      :connection="connection"
-      @close="showFillDialog = false"
-      @connect="confirmFill"
     />
 
     <DisconnectChainDialog

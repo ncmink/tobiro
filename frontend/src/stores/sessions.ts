@@ -5,9 +5,10 @@ import {
   CancelInteraction,
   Connect,
   Disconnect,
+  FillNativeLoginHotkey,
   OpenNativeClient,
-  ProceedNativeFill,
   RefreshStatus,
+  SetNativeFillProfile,
   SubmitOTP,
 } from '@bindings/go/main/App'
 import type { domain } from '@bindings/go/models'
@@ -37,15 +38,6 @@ export interface HostKeyRequest {
   knownHosts: string
 }
 
-/** Emitted after vendor login fields are visible, before auto-fill runs. */
-export interface NativeFillPending {
-  requestId: string
-  profileId: string
-  connectionName: string
-  hasPassword: boolean
-  countdownSeconds: number
-}
-
 interface ConnectionFailed {
   sessionId: string
   profileId: string
@@ -68,12 +60,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   const otpError = ref('')
 
   const hostKeyRequest = ref<HostKeyRequest | null>(null)
-  const nativeFillPending = ref<NativeFillPending | null>(null)
-  const nativeFillSecondsLeft = ref(0)
-  let nativeFillTick: number | undefined
 
-  // Ticks once a second so connected durations count up without the backend
-  // having to push an event every second.
   const now = ref(Date.now())
   let ticker: number | undefined
   let listening = false
@@ -102,7 +89,6 @@ export const useSessionsStore = defineStore('sessions', () => {
     delete errors.value[profileId]
   }
 
-  /** Seconds a tunnel has been up, recomputed from the ticking clock. */
   function durationFor(profileId: string): number {
     const session = sessions.value[profileId]
     if (!session?.connectedAt || session.state !== 'connected') {
@@ -141,11 +127,6 @@ export const useSessionsStore = defineStore('sessions', () => {
       hostKeyRequest.value = request
     })
 
-    EventsOn('auth:native_fill_pending', (request: NativeFillPending) => {
-      nativeFillPending.value = request
-      startNativeFillTick()
-    })
-
     EventsOn('connection:failed', (failure: ConnectionFailed) => {
       errors.value = { ...errors.value, [failure.profileId]: failure.reason }
     })
@@ -158,50 +139,6 @@ export const useSessionsStore = defineStore('sessions', () => {
   function dispose() {
     if (ticker !== undefined) window.clearInterval(ticker)
     ticker = undefined
-    clearNativeFillTick()
-  }
-
-  function clearNativeFillTick() {
-    if (nativeFillTick !== undefined) window.clearInterval(nativeFillTick)
-    nativeFillTick = undefined
-  }
-
-  function startNativeFillTick() {
-    clearNativeFillTick()
-    const pending = nativeFillPending.value
-    if (!pending) return
-    nativeFillSecondsLeft.value = pending.countdownSeconds
-    nativeFillTick = window.setInterval(() => {
-      if (nativeFillSecondsLeft.value <= 1) {
-        void proceedNativeFill()
-        return
-      }
-      nativeFillSecondsLeft.value -= 1
-    }, 1000)
-  }
-
-  async function proceedNativeFill() {
-    if (!nativeFillPending.value) return
-    const { requestId } = nativeFillPending.value
-    clearNativeFillTick()
-    nativeFillPending.value = null
-    try {
-      await ProceedNativeFill(requestId)
-    } catch {
-      // Fill already finished or was cancelled.
-    }
-  }
-
-  async function cancelNativeFill() {
-    if (!nativeFillPending.value) return
-    const { requestId } = nativeFillPending.value
-    clearNativeFillTick()
-    nativeFillPending.value = null
-    try {
-      await CancelInteraction(requestId)
-    } catch {
-      // Nothing left waiting.
-    }
   }
 
   async function connect(profileId: string, credentialId: string) {
@@ -234,6 +171,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   async function openNativeClient(profileId: string, credentialId = '') {
     try {
       await OpenNativeClient(profileId, credentialId)
+      await SetNativeFillProfile(profileId)
       delete errors.value[profileId]
       await refresh()
       return true
@@ -243,6 +181,36 @@ export const useSessionsStore = defineStore('sessions', () => {
         [profileId]: errorMessage(err, 'Could not open the vendor client'),
       }
       return false
+    }
+  }
+
+  async function fillNativeLoginHotkey(profileId = '') {
+    const key = profileId || '_hotkey'
+    busy.value = { ...busy.value, [key]: true }
+    if (profileId) delete errors.value[profileId]
+    try {
+      await FillNativeLoginHotkey(profileId)
+      if (profileId) delete errors.value[profileId]
+      return true
+    } catch (err) {
+      const message = errorMessage(err, 'Could not fill the login form')
+      if (profileId) {
+        errors.value = { ...errors.value, [profileId]: message }
+      } else {
+        errors.value = { ...errors.value, _hotkey: message }
+      }
+      return false
+    } finally {
+      busy.value = { ...busy.value, [key]: false }
+    }
+  }
+
+  async function rememberNativeFillProfile(profileId: string) {
+    if (!profileId) return
+    try {
+      await SetNativeFillProfile(profileId)
+    } catch {
+      // non-fatal
     }
   }
 
@@ -276,13 +244,6 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  /**
-   * Vouch for an SSH server, or refuse it.
-   *
-   * Accepting is delivered as an ordinary prompt answer; the backend records
-   * the key in known_hosts so the question is only asked once. Refusing cancels
-   * the prompt, which fails the connection rather than continuing unverified.
-   */
   async function answerHostKey(accept: boolean) {
     if (!hostKeyRequest.value) return
     const { requestId } = hostKeyRequest.value
@@ -309,7 +270,6 @@ export const useSessionsStore = defineStore('sessions', () => {
       }
       sessions.value = next
     } catch (err) {
-      // Status polling is best-effort; a failure must not break the dashboard.
       console.warn('status refresh failed', errorMessage(err))
     }
   }
@@ -320,13 +280,9 @@ export const useSessionsStore = defineStore('sessions', () => {
     otpSubmitting,
     otpError,
     hostKeyRequest,
-    nativeFillPending,
-    nativeFillSecondsLeft,
     anyConnected,
     init,
     dispose,
-    clearNativeFillTick,
-    startNativeFillTick,
     sessionFor,
     stateFor,
     isBusy,
@@ -336,11 +292,11 @@ export const useSessionsStore = defineStore('sessions', () => {
     connect,
     disconnect,
     openNativeClient,
+    fillNativeLoginHotkey,
+    rememberNativeFillProfile,
     submitOtp,
     cancelOtp,
     answerHostKey,
-    proceedNativeFill,
-    cancelNativeFill,
     refresh,
   }
 })

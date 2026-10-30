@@ -22,6 +22,10 @@ export function Disconnect(arg1:string):Promise<domain.SessionView>;
 
 export function ExportConnections():Promise<main.ExportResultView>;
 
+export function FillNativeLogin(arg1:string,arg2:string):Promise<void>;
+
+export function FillNativeLoginHotkey(arg1:string):Promise<void>;
+
 export function GetBootstrap():Promise<main.BootstrapView>;
 
 export function GetClientStartup(arg1:string):Promise<domain.StartupState>;
@@ -67,6 +71,8 @@ export function SetClientStartup(arg1:string,arg2:boolean):Promise<domain.Startu
 export function SetDefaultCredential(arg1:string):Promise<void>;
 
 export function SetGroupHidden(arg1:string,arg2:boolean):Promise<Array<domain.GroupView>>;
+
+export function SetNativeFillProfile(arg1:string):Promise<void>;
 
 export function SubmitOTP(arg1:string,arg2:string):Promise<void>;
 

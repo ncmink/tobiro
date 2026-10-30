@@ -441,10 +441,8 @@ func (m *Manager) confirmStatus(profileID string, status domain.VPNStatus) bool 
 	return true
 }
 
-// OpenNativeClient launches the vendor GUI — the documented fallback when
-// programmatic control is unavailable. When credentialID is set, adapters
-// that can fill a login dialog type the stored username and password and
-// still leave Connect for the user to click.
+// OpenNativeClient launches the vendor GUI only. Use FillNativeLogin when the
+// user has the login form on screen and presses Fill in Tobiro.
 func (m *Manager) OpenNativeClient(ctx context.Context, profileID, credentialID string) error {
 	profile, err := m.profiles.Get(profileID)
 	if err != nil {
@@ -454,27 +452,54 @@ func (m *Manager) OpenNativeClient(ctx context.Context, profileID, credentialID 
 	if err != nil {
 		return err
 	}
+	if credentialID != "" {
+		if _, err := m.resolveForFill(profileID, credentialID); err != nil {
+			return err
+		}
+	}
+
+	m.log.Info("Opening native client for profile=%s provider=%s", profile.Name, profile.Provider)
+	if err := adapter.OpenNativeClient(ctx, profile); err != nil {
+		return err
+	}
+
+	m.WatchAfterOpen(ctx, profile)
+	return nil
+}
+
+// FillNativeLogin keystrokes username and password into the vendor field that
+// already has keyboard focus when the user presses ⌘I. See nativefill on macOS.
+func (m *Manager) FillNativeLogin(ctx context.Context, profileID, credentialID string) error {
+	profile, err := m.profiles.Get(profileID)
+	if err != nil {
+		return err
+	}
+	adapter, err := m.registry.Get(profile.Provider)
+	if err != nil {
+		return err
+	}
+	filler, ok := adapter.(LoginFiller)
+	if !ok || runtime.GOOS != "darwin" {
+		return fmt.Errorf("%s cannot fill login fields from Tobiro on this platform", profile.Provider.DisplayName())
+	}
 
 	credential, err := m.resolveForFill(profileID, credentialID)
 	if err != nil {
 		return err
 	}
+	if !canFillLogin(credential) {
+		return fmt.Errorf("choose an account with a username or saved password")
+	}
 
-	m.log.Info("Opening native client for profile=%s provider=%s credential=%s",
-		profile.Name, profile.Provider, defaultString(credential.ID, "none"))
-	if err := adapter.OpenNativeClient(ctx, profile); err != nil {
+	release := m.log.Protect(credential.Secret)
+	defer release()
+
+	err = filler.FillNativeLogin(ctx, profile, credential)
+	if err != nil {
 		return err
 	}
-
-	if runtime.GOOS == "darwin" {
-		if filler, ok := adapter.(LoginFiller); ok && canFillLogin(credential) {
-			if err := m.fillNativeLogin(ctx, filler, profile, credential); err != nil {
-				return err
-			}
-		}
-	}
-
-	m.WatchAfterOpen(ctx, profile)
+	m.log.Info("Filled login fields in the native client for credential=%s", credential.ID)
+	_ = m.profiles.RememberCredential(profileID, credential.ID)
 	return nil
 }
 
@@ -541,6 +566,33 @@ func (m *Manager) DiagnoseNetwork(ctx context.Context, profileID string) (domain
 	return doctor.DiagnoseNetwork(ctx, profile)
 }
 
+// ProfileForNativeProcess returns the profile whose vendor app owns the named
+// process, preferring preferredID when it matches. Empty means no match.
+func (m *Manager) ProfileForNativeProcess(processName, preferredID string) string {
+	if processName == "" {
+		return ""
+	}
+	owns := func(p domain.VPNProfile) bool {
+		adapter, err := m.registry.Get(p.Provider)
+		if err != nil {
+			return false
+		}
+		owner, ok := adapter.(NativeProcessOwner)
+		return ok && owner.OwnsNativeProcess(processName)
+	}
+	if preferredID != "" {
+		if p, err := m.profiles.Get(preferredID); err == nil && owns(p) {
+			return p.ID
+		}
+	}
+	for _, p := range m.profiles.List() {
+		if owns(p) {
+			return p.ID
+		}
+	}
+	return ""
+}
+
 func (m *Manager) resolveForFill(profileID, credentialID string) (domain.Credential, error) {
 	if credentialID == "" {
 		return domain.Credential{}, nil
@@ -554,6 +606,9 @@ func (m *Manager) resolveForFill(profileID, credentialID string) (domain.Credent
 	}
 	resolved, err := m.credentials.Resolve(credentialID)
 	if err != nil {
+		if cred.RequiresSecret() {
+			return domain.Credential{}, err
+		}
 		m.log.Info("No stored password for credential=%s; filling username only", credentialID)
 		return cred, nil
 	}
@@ -562,95 +617,6 @@ func (m *Manager) resolveForFill(profileID, credentialID string) (domain.Credent
 
 func canFillLogin(credential domain.Credential) bool {
 	return strings.TrimSpace(credential.Username) != "" || credential.Secret != ""
-}
-
-func (m *Manager) fillNativeLogin(ctx context.Context, filler LoginFiller, profile domain.VPNProfile, credential domain.Credential) error {
-	release := m.log.Protect(credential.Secret)
-	prober, canProbe := filler.(NativeLoginProber)
-
-	go func() {
-		defer release()
-		waitCtx, cancel := context.WithTimeout(ctx, burstDuration)
-		defer cancel()
-		ticker := time.NewTicker(burstInterval)
-		defer ticker.Stop()
-
-		if canProbe {
-			var lastProbe error
-			for {
-				err := prober.ProbeNativeLogin(waitCtx, profile, credential)
-				if err == nil {
-					break
-				}
-				lastProbe = err
-				if errors.Is(err, domain.ErrAssistiveAccess) {
-					m.log.Warn("%s", err.Error())
-					m.notifyFillFailed(profile.ID, err.Error())
-					return
-				}
-				select {
-				case <-waitCtx.Done():
-					reason := "Could not find the login fields in " + profile.Name + ". Leave the username and password form open, and allow Tobiro in System Settings → Privacy & Security → Accessibility."
-					if lastProbe != nil {
-						m.log.Info("%s (%v)", reason, lastProbe)
-					} else {
-						m.log.Info("%s", reason)
-					}
-					m.notifyFillFailed(profile.ID, reason)
-					return
-				case <-ticker.C:
-				}
-			}
-		}
-
-		if canProbe && m.prompter != nil {
-			if err := m.prompter.AwaitNativeFill(waitCtx, domain.NativeFillRequest{
-				ProfileID:   profile.ID,
-				ProfileName: profile.Name,
-				HasPassword: credential.Secret != "",
-			}); err != nil {
-				if errors.Is(err, domain.ErrInteractionCancelled) {
-					m.log.Info("Login fill cancelled for credential=%s", credential.ID)
-				}
-				return
-			}
-		}
-
-		for {
-			err := filler.FillNativeLogin(waitCtx, profile, credential)
-			if err == nil {
-				m.log.Info("Filled login fields in the native client for credential=%s", credential.ID)
-				_ = m.profiles.RememberCredential(profile.ID, credential.ID)
-				return
-			}
-			if errors.Is(err, domain.ErrAssistiveAccess) {
-				m.log.Warn("%s", err.Error())
-				return
-			}
-			select {
-			case <-waitCtx.Done():
-				reason := "Found the " + profile.Name + " login form, but could not type into it. Allow Tobiro in System Settings → Privacy & Security → Accessibility, then try again."
-				m.log.Info("%s", reason)
-				m.notifyFillFailed(profile.ID, reason)
-				return
-			case <-ticker.C:
-			}
-		}
-	}()
-	return nil
-}
-
-// notifyFillFailed surfaces a native-login failure on the connection card.
-// The fill runs after OpenNativeClient has already returned, so this is the
-// only way the window hears about it.
-func (m *Manager) notifyFillFailed(profileID, reason string) {
-	if m.prompter == nil {
-		return
-	}
-	m.prompter.Notify(domain.EventConnectionFailed, domain.ConnectionFailedEvent{
-		ProfileID: profileID,
-		Reason:    reason,
-	})
 }
 
 // WatchAfterOpen invalidates the probe cache and polls this profile rapidly

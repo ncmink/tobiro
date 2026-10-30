@@ -47,6 +47,10 @@ type Capabilities struct {
 	// fallback path for the user to finish the connection manually.
 	CanOpenNativeClient bool `json:"canOpenNativeClient"`
 
+	// CanFillNativeLogin reports whether Tobiro can type a saved account into
+	// the vendor login form when the user asks (macOS Accessibility).
+	CanFillNativeLogin bool `json:"canFillNativeLogin"`
+
 	// NativeClientLabel names that action when "native client" would be wrong —
 	// the macOS VPN adapter opens System Settings, not a vendor app. Empty
 	// leaves the UI's own wording in place.

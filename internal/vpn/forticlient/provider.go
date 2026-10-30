@@ -138,11 +138,14 @@ func (p *Provider) Capabilities(ctx context.Context) (*domain.Capabilities, erro
 	if caps.CanOpenNativeClient {
 		caps.NativeClientLabel = "Open FortiClient"
 	}
+	if runtime.GOOS == "darwin" && caps.CanOpenNativeClient {
+		caps.CanFillNativeLogin = true
+	}
 	switch runtime.GOOS {
 	case "linux":
 		caps.Notes = "The fortivpn command line connects by tunnel name, so the tunnel must already exist in FortiClient. Command support is disabled until verified."
 	case "darwin":
-		caps.Notes = "FortiClient blocks paste in the password field. Tobiro opens the client and types the saved username and password — click Connect in FortiClient. Typing needs Accessibility permission for Tobiro."
+		caps.Notes = "Open the FortiClient login window, then press ⌘I. Tobiro fills username and password; you click Connect in FortiClient. Needs Accessibility permission for Tobiro."
 	default:
 		caps.Notes = "Tobiro opens FortiClient so you can complete the login there. Fortinet documents no supported connect command line on this platform."
 	}

@@ -35,6 +35,9 @@ type Data struct {
 	// Groups is keyed by group name, which is the same string profiles carry.
 	// Only groups with non-default presentation are kept here.
 	Groups map[string]domain.GroupSettings `json:"groups"`
+
+	// LastNativeFillProfileID is which connection ⌘I fills after restart.
+	LastNativeFillProfileID string `json:"lastNativeFillProfileId,omitempty"`
 }
 
 func newData() *Data {

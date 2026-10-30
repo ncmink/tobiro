@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"tobiro/internal/access"
 	"tobiro/internal/credential"
@@ -52,6 +53,11 @@ type App struct {
 	peer           *peer.Server
 	notifier       *peer.Notifier
 	pendingConnect pendingConnect
+
+	fillTargetMu        sync.Mutex
+	fillTargetProfileID string
+
+	fillHotkeyStop func()
 }
 
 // NewApp builds the binding surface from already-wired services.
@@ -102,7 +108,10 @@ func (a *App) startup(ctx context.Context) {
 	a.startPeerNotifier()
 	a.startPeerEndpoint()
 
+	a.restoreNativeFillProfile()
+
 	a.vpn.StartWatching(ctx)
+	a.startFillHotkey()
 }
 
 // ---------------------------------------------------------------- bootstrap
@@ -315,14 +324,24 @@ func (a *App) Disconnect(profileID string) (domain.SessionView, error) {
 	return sess.View(), nil
 }
 
-// OpenNativeClient launches the vendor GUI, the fallback when the installed
-// client cannot be driven programmatically. Pass a credential UUID to fill
-// the vendor login fields (username + password) without clicking Connect.
+// OpenNativeClient launches the vendor GUI only. Login fields are filled
+// separately via FillNativeLogin when the user asks.
 func (a *App) OpenNativeClient(profileID string, credentialID string) error {
 	if err := a.requireVendorClient(profileID, "open"); err != nil {
 		return err
 	}
+	a.setNativeFillProfile(profileID)
 	return a.describe(a.vpn.OpenNativeClient(a.ctx, profileID, credentialID))
+}
+
+// FillNativeLogin types the chosen account when the vendor login field already
+// has focus and the user presses ⌘I.
+func (a *App) FillNativeLogin(profileID string, credentialID string) error {
+	if err := a.requireVendorClient(profileID, "fill login for"); err != nil {
+		return err
+	}
+	a.setNativeFillProfile(profileID)
+	return a.describe(a.vpn.FillNativeLogin(a.ctx, profileID, credentialID))
 }
 
 // GetClientStartup reports whether the vendor GUI opens when the user logs in.

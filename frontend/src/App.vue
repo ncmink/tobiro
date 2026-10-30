@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
-import { RouterView, useRouter } from 'vue-router'
+import { onMounted, onUnmounted, watch } from 'vue'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 
 import { TakeConnectRequest } from '@bindings/go/main/App'
 import { Environment, EventsOn } from '@bindings/runtime/runtime'
 import HostKeyDialog from '@/components/HostKeyDialog.vue'
-import FillCountdownDialog from '@/components/FillCountdownDialog.vue'
 import OtpDialog from '@/components/OtpDialog.vue'
 import { useConnectionSharing } from '@/lib/connectionSharing'
 import { coerceSession } from '@/lib/state'
@@ -13,9 +12,10 @@ import { useConnectionsStore } from '@/stores/connections'
 import { useSessionsStore } from '@/stores/sessions'
 
 const router = useRouter()
+const route = useRoute()
 const store = useConnectionsStore()
 const sessions = useSessionsStore()
-const { notice, dismissNotice } = useConnectionSharing()
+const { notice, dismissNotice, showFillLoginNotice } = useConnectionSharing()
 
 let statusPoll: number | undefined
 
@@ -27,6 +27,14 @@ async function collectConnectRequest() {
   await store.refresh()
   await router.push({ name: 'connection', params: { id }, query: { connect: '1' } })
 }
+
+watch(
+  () => route.params.id,
+  (id) => {
+    if (typeof id === 'string' && id) void sessions.rememberNativeFillProfile(id)
+  },
+  { immediate: true },
+)
 
 onMounted(async () => {
   if ('runtime' in window) {
@@ -44,6 +52,11 @@ onMounted(async () => {
     if (session) store.applySession(session)
   })
   EventsOn('peer:connect_requested', () => void collectConnectRequest())
+  EventsOn('fill:login_result', (payload: { ok?: boolean; message?: string }) => {
+    const text = payload?.message?.trim()
+    if (!text) return
+    showFillLoginNotice(text, payload.ok === true)
+  })
 
   await collectConnectRequest()
 
@@ -89,6 +102,5 @@ onUnmounted(() => {
 
     <OtpDialog v-if="sessions.otpRequest" />
     <HostKeyDialog v-if="sessions.hostKeyRequest" />
-    <FillCountdownDialog />
   </div>
 </template>

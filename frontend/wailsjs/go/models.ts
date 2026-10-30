@@ -33,6 +33,7 @@ export namespace domain {
 	    requiresNativeUi: boolean;
 	    accountOptional: boolean;
 	    canOpenNativeClient: boolean;
+	    canFillNativeLogin: boolean;
 	    nativeClientLabel: string;
 	    canControlStartup: boolean;
 	    notes: string;
@@ -53,6 +54,7 @@ export namespace domain {
 	        this.requiresNativeUi = source["requiresNativeUi"];
 	        this.accountOptional = source["accountOptional"];
 	        this.canOpenNativeClient = source["canOpenNativeClient"];
+	        this.canFillNativeLogin = source["canFillNativeLogin"];
 	        this.nativeClientLabel = source["nativeClientLabel"];
 	        this.canControlStartup = source["canControlStartup"];
 	        this.notes = source["notes"];

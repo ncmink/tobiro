@@ -51,6 +51,11 @@ type LoginFiller interface {
 	FillNativeLogin(ctx context.Context, profile domain.VPNProfile, credential domain.Credential) error
 }
 
+// NativeProcessOwner lets ⌘I pick the connection whose vendor app is in front.
+type NativeProcessOwner interface {
+	OwnsNativeProcess(name string) bool
+}
+
 // NativeLoginProber is implemented on macOS by adapters that can detect vendor
 // login fields before typing. A nil error means the fields are ready to fill.
 type NativeLoginProber interface {
