@@ -467,6 +467,24 @@ func (m *Manager) OpenNativeClient(ctx context.Context, profileID, credentialID 
 	return nil
 }
 
+// ProbeNativeLogin asks the vendor adapter whether a username field is visible
+// in the native login window. A nil error means the fill shortcut can be used.
+func (m *Manager) ProbeNativeLogin(ctx context.Context, profileID string) error {
+	profile, err := m.profiles.Get(profileID)
+	if err != nil {
+		return err
+	}
+	adapter, err := m.registry.Get(profile.Provider)
+	if err != nil {
+		return err
+	}
+	prober, ok := adapter.(NativeLoginProber)
+	if !ok {
+		return fmt.Errorf("%s cannot detect login fields from Tobiro on this platform", profile.Provider.DisplayName())
+	}
+	return prober.ProbeNativeLogin(ctx, profile, domain.Credential{})
+}
+
 // FillNativeLogin keystrokes username and password into the vendor field that
 // already has keyboard focus when the user presses ⌘I. See nativefill on macOS.
 func (m *Manager) FillNativeLogin(ctx context.Context, profileID, credentialID string) error {

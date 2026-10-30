@@ -71,7 +71,7 @@ func (a *App) fillNativeLoginHotkey(profileID string) error {
 		a.log.Info("Fill login hotkey: front app=%q connection=%s", front, profileID)
 	}
 	if profileID == "" {
-		return fmt.Errorf("choose a connection in Tobiro first (open it or use Open client), then press ⌘I in the VPN login window")
+		return fmt.Errorf("choose a connection in Tobiro first (open it or use Open client), then press %s in the VPN login window", a.fillShortcutDisplay())
 	}
 	if err := a.requireVendorClient(profileID, "fill login for"); err != nil {
 		return err
@@ -100,18 +100,23 @@ func (a *App) notifyFillLoginResult(err error) {
 	}
 	a.bridge.Notify(domain.EventFillLoginResult, FillLoginResultView{
 		OK:      false,
-		Message: fillLoginErrorMessage(err),
+		Message: fillLoginErrorMessage(err, a.fillShortcutDisplay()),
 	})
 }
 
-func fillLoginErrorMessage(err error) string {
+func fillLoginErrorMessage(err error, shortcutDisplay string) string {
+	if shortcutDisplay == "" {
+		shortcutDisplay = "⌘I"
+	}
 	switch {
 	case errors.Is(err, nativefill.ErrNoFocus):
-		return "Click a username or password field in the VPN client, then press ⌘I again. Tobiro keeps the connection even when another app was in front."
+		return fmt.Sprintf("Open the VPN client login window, then press %s again.", shortcutDisplay)
 	case errors.Is(err, nativefill.ErrNotEditable):
-		return "The VPN client focus is not in a login field — click inside the username or password box, then press ⌘I."
+		return fmt.Sprintf("Click inside a login field in the VPN client, then press %s.", shortcutDisplay)
 	case errors.Is(err, nativefill.ErrNoVendorApp):
-		return "Open the VPN client for this connection, click a login field, then press ⌘I."
+		return fmt.Sprintf("Open the VPN client login window, then press %s.", shortcutDisplay)
+	case errors.Is(err, domain.ErrAssistiveAccess):
+		return domain.ErrAssistiveAccess.Error()
 	default:
 		return err.Error()
 	}
@@ -132,7 +137,7 @@ func (a *App) pickFillCredential(profileID string) (string, error) {
 		}
 	}
 	if len(eligible) == 0 {
-		return "", fmt.Errorf("save an account on %s before using ⌘I", view.Profile.Name)
+		return "", fmt.Errorf("save an account on %s before using the fill shortcut", view.Profile.Name)
 	}
 	if view.SuggestedCredentialID != "" {
 		for _, id := range eligible {

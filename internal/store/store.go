@@ -38,6 +38,12 @@ type Data struct {
 
 	// LastNativeFillProfileID is which connection ⌘I fills after restart.
 	LastNativeFillProfileID string `json:"lastNativeFillProfileId,omitempty"`
+
+	// FillHotkey stores the global fill shortcut, e.g. "cmd+i". Empty means default.
+	FillHotkey string `json:"fillHotkey,omitempty"`
+
+	// FillHotkeyIntroSeen suppresses the first-run fill shortcut dialog.
+	FillHotkeyIntroSeen bool `json:"fillHotkeyIntroSeen,omitempty"`
 }
 
 func newData() *Data {

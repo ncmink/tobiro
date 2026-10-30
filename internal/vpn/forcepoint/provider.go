@@ -97,7 +97,7 @@ func (p *Provider) Capabilities(ctx context.Context) (*domain.Capabilities, erro
 		caps.CanControlStartup = runtime.GOOS == "darwin"
 		if runtime.GOOS == "darwin" {
 			caps.CanFillNativeLogin = true
-			caps.Notes = "Open Forcepoint, click Connect, press ⌘I, then click the login field. Tobiro fills username and password; you click Authenticate. Needs Accessibility permission for Tobiro."
+			caps.Notes = "Open the Forcepoint login window, then press your fill shortcut (default ⌘I). Tobiro fills username and password; you click Authenticate. Needs Accessibility permission for Tobiro."
 		} else {
 			caps.Notes = "Forcepoint documents no CLI for connecting, so logging in happens in the Forcepoint client. Tobiro watches the tunnel and shows its status here."
 		}

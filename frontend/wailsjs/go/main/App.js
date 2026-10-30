@@ -34,6 +34,10 @@ export function Disconnect(arg1) {
   return window['go']['main']['App']['Disconnect'](arg1);
 }
 
+export function DismissFillShortcutIntro() {
+  return window['go']['main']['App']['DismissFillShortcutIntro']();
+}
+
 export function ExportConnections() {
   return window['go']['main']['App']['ExportConnections']();
 }
@@ -56,6 +60,14 @@ export function GetClientStartup(arg1) {
 
 export function GetConnection(arg1) {
   return window['go']['main']['App']['GetConnection'](arg1);
+}
+
+export function GetFillPermissions() {
+  return window['go']['main']['App']['GetFillPermissions']();
+}
+
+export function GetFillShortcut() {
+  return window['go']['main']['App']['GetFillShortcut']();
 }
 
 export function GetLogs() {
@@ -106,6 +118,10 @@ export function OpenNativeClient(arg1, arg2) {
   return window['go']['main']['App']['OpenNativeClient'](arg1, arg2);
 }
 
+export function OpenPrivacySettings(arg1) {
+  return window['go']['main']['App']['OpenPrivacySettings'](arg1);
+}
+
 export function ProceedNativeFill(arg1) {
   return window['go']['main']['App']['ProceedNativeFill'](arg1);
 }
@@ -122,6 +138,10 @@ export function RefreshStatus() {
   return window['go']['main']['App']['RefreshStatus']();
 }
 
+export function ResetFillShortcut() {
+  return window['go']['main']['App']['ResetFillShortcut']();
+}
+
 export function SaveTunnel(arg1, arg2) {
   return window['go']['main']['App']['SaveTunnel'](arg1, arg2);
 }
@@ -134,12 +154,20 @@ export function SetDefaultCredential(arg1) {
   return window['go']['main']['App']['SetDefaultCredential'](arg1);
 }
 
+export function SetFillShortcut(arg1) {
+  return window['go']['main']['App']['SetFillShortcut'](arg1);
+}
+
 export function SetGroupHidden(arg1, arg2) {
   return window['go']['main']['App']['SetGroupHidden'](arg1, arg2);
 }
 
 export function SetNativeFillProfile(arg1) {
   return window['go']['main']['App']['SetNativeFillProfile'](arg1);
+}
+
+export function ShowFillShortcutIntro() {
+  return window['go']['main']['App']['ShowFillShortcutIntro']();
 }
 
 export function SubmitOTP(arg1, arg2) {

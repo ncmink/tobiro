@@ -15,6 +15,7 @@ import TunnelSettings from '@/components/TunnelSettings.vue'
 import { connectionId, connectionParentId, descendants, findNode, forest } from '@/lib/chain'
 import { accountToConnectWith, canConnect, errorMessage, formatDuration, isActive } from '@/lib/state'
 import { useConnectionsStore } from '@/stores/connections'
+import { useFillShortcutStore } from '@/stores/fillShortcut'
 import { useSessionsStore } from '@/stores/sessions'
 
 const props = defineProps<{ id: string }>()
@@ -23,6 +24,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useConnectionsStore()
 const sessions = useSessionsStore()
+const fillShortcut = useFillShortcutStore()
 
 const connection = computed(() => store.byId(props.id))
 
@@ -411,7 +413,7 @@ onUnmounted(() => {
             v-if="capabilities?.canFillNativeLogin"
             class="w-full text-xs text-ink-muted"
           >
-            Open the vendor login window, then press ⌘I — Tobiro fills username and password.
+            Open the vendor login window, then press {{ fillShortcut.display }} — Tobiro fills username and password.
           </p>
           <button
             type="button"

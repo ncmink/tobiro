@@ -121,6 +121,32 @@ type FillLoginResultView struct {
 	Message string `json:"message"`
 }
 
+// FillLoginDetectedView is pushed when a vendor username field is visible
+// after Open client, before the user presses the fill shortcut.
+type FillLoginDetectedView struct {
+	ProfileID       string `json:"profileId"`
+	ConnectionName  string `json:"connectionName"`
+	ShortcutDisplay string `json:"shortcutDisplay"`
+}
+
+// FillShortcutView describes the global fill-login shortcut.
+type FillShortcutView struct {
+	Supported     bool   `json:"supported"`
+	Combo         string `json:"combo"`
+	Display       string `json:"display"`
+	Registered    bool   `json:"registered"`
+	RegisterError string `json:"registerError"`
+	IntroSeen     bool   `json:"introSeen"`
+}
+
+// FillPermissionsView reports macOS privacy settings for fill login.
+type FillPermissionsView struct {
+	Supported              bool   `json:"supported"`
+	AccessibilityGranted   bool   `json:"accessibilityGranted"`
+	AutomationHint         string `json:"automationHint"`
+	InputMonitoringHint    string `json:"inputMonitoringHint"`
+}
+
 // OTPRequestView is pushed to the UI when authentication pauses for a code.
 type OTPRequestView struct {
 	RequestID string `json:"requestId"`

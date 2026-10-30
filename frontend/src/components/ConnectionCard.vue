@@ -10,6 +10,7 @@ import { descendants, type ChainNode } from '@/lib/chain'
 import { canConnect, formatDuration, isActive, stateStyle } from '@/lib/state'
 import { canFillNativeLogin } from '@/lib/nativeFill'
 import { useConnectionsStore } from '@/stores/connections'
+import { useFillShortcutStore } from '@/stores/fillShortcut'
 import { useSessionsStore } from '@/stores/sessions'
 
 defineOptions({ name: 'ConnectionCard' })
@@ -33,6 +34,7 @@ const emit = defineEmits<{
 
 const connectionsStore = useConnectionsStore()
 const sessions = useSessionsStore()
+const fillShortcut = useFillShortcutStore()
 
 const profileId = computed(() => props.connection.profile.id)
 const state = computed(() => {
@@ -138,10 +140,11 @@ const manualClient = computed(() =>
 const manualHint = computed(() => {
   if (!manualClient.value) return ''
   if (canFillNativeLogin(props.connection)) {
+    const key = fillShortcut.display
     if (props.connection.profile.provider === 'forcepoint') {
-      return 'Open Forcepoint, click Connect, click the login field, then press ⌘I — Tobiro fills username and password.'
+      return `Open Forcepoint, click Connect, open the login window, then press ${key} — Tobiro fills username and password.`
     }
-    return 'Open the client login window, then press ⌘I — Tobiro fills username and password.'
+    return `Open the client login window, then press ${key} — Tobiro fills username and password.`
   }
   if (props.connection.profile.provider === 'forcepoint') {
     return 'Open Forcepoint, then click Connect in its window.'

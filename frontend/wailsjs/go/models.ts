@@ -804,6 +804,46 @@ export namespace main {
 	        this.cancelled = source["cancelled"];
 	    }
 	}
+	export class FillPermissionsView {
+	    supported: boolean;
+	    accessibilityGranted: boolean;
+	    automationHint: string;
+	    inputMonitoringHint: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FillPermissionsView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supported = source["supported"];
+	        this.accessibilityGranted = source["accessibilityGranted"];
+	        this.automationHint = source["automationHint"];
+	        this.inputMonitoringHint = source["inputMonitoringHint"];
+	    }
+	}
+	export class FillShortcutView {
+	    supported: boolean;
+	    combo: string;
+	    display: string;
+	    registered: boolean;
+	    registerError: string;
+	    introSeen: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FillShortcutView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supported = source["supported"];
+	        this.combo = source["combo"];
+	        this.display = source["display"];
+	        this.registered = source["registered"];
+	        this.registerError = source["registerError"];
+	        this.introSeen = source["introSeen"];
+	    }
+	}
 	export class ImportResultView {
 	    file: string;
 	    connections: number;

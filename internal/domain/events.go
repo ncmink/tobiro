@@ -27,6 +27,10 @@ const (
 	// EventFillLoginResult reports the outcome of a ⌘I fill attempt for a toast.
 	EventFillLoginResult = "fill:login_result"
 
+	// EventFillLoginDetected is raised after Open client when a vendor username
+	// field becomes visible, so the UI can suggest the fill shortcut.
+	EventFillLoginDetected = "fill:login_detected"
+
 	// EventHostKeyReview asks the user to vouch for an SSH server nobody on
 	// this machine has met before. It is the one moment where accepting is a
 	// security decision rather than a convenience, so it is never answered

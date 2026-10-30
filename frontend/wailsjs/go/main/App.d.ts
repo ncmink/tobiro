@@ -20,6 +20,8 @@ export function DeleteCredential(arg1:string):Promise<void>;
 
 export function Disconnect(arg1:string):Promise<domain.SessionView>;
 
+export function DismissFillShortcutIntro():Promise<void>;
+
 export function ExportConnections():Promise<main.ExportResultView>;
 
 export function FillNativeLogin(arg1:string,arg2:string):Promise<void>;
@@ -31,6 +33,10 @@ export function GetBootstrap():Promise<main.BootstrapView>;
 export function GetClientStartup(arg1:string):Promise<domain.StartupState>;
 
 export function GetConnection(arg1:string):Promise<main.ConnectionView>;
+
+export function GetFillPermissions():Promise<main.FillPermissionsView>;
+
+export function GetFillShortcut():Promise<main.FillShortcutView>;
 
 export function GetLogs():Promise<Array<logging.Entry>>;
 
@@ -56,6 +62,8 @@ export function OpenInKube(arg1:main.OpenKubeInput):Promise<main.OpenKubeResultV
 
 export function OpenNativeClient(arg1:string,arg2:string):Promise<void>;
 
+export function OpenPrivacySettings(arg1:string):Promise<void>;
+
 export function ProceedNativeFill(arg1:string):Promise<void>;
 
 export function ReadSSHCommand(arg1:string):Promise<domain.SSHCommand>;
@@ -64,15 +72,21 @@ export function RefreshProviderDetection():Promise<Array<domain.ProviderStatusVi
 
 export function RefreshStatus():Promise<Array<domain.SessionView>>;
 
+export function ResetFillShortcut():Promise<void>;
+
 export function SaveTunnel(arg1:string,arg2:domain.TunnelInput):Promise<main.ConnectionView>;
 
 export function SetClientStartup(arg1:string,arg2:boolean):Promise<domain.StartupState>;
 
 export function SetDefaultCredential(arg1:string):Promise<void>;
 
+export function SetFillShortcut(arg1:string):Promise<void>;
+
 export function SetGroupHidden(arg1:string,arg2:boolean):Promise<Array<domain.GroupView>>;
 
 export function SetNativeFillProfile(arg1:string):Promise<void>;
+
+export function ShowFillShortcutIntro():Promise<void>;
 
 export function SubmitOTP(arg1:string,arg2:string):Promise<void>;
 

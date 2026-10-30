@@ -60,12 +60,201 @@ func (p *Provider) FillNativeLogin(ctx context.Context, _ domain.VPNProfile, cre
 	return errFillWaiting
 }
 
-// ProbeNativeLogin is unused by Tobiro; fill is manual via ⌘I.
-func (p *Provider) ProbeNativeLogin(_ context.Context, _ domain.VPNProfile, credential domain.Credential) error {
-	if !canFill(credential) {
+// ProbeNativeLogin reports whether FortiClient's login form exposes a username
+// field. A nil error means the user can press the fill shortcut.
+func (p *Provider) ProbeNativeLogin(ctx context.Context, _ domain.VPNProfile, _ domain.Credential) error {
+	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, osascriptPath, "-")
+	cmd.Stdin = strings.NewReader(buildProbeScript())
+	var out, errBuf bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errBuf
+	err := cmd.Run()
+	stderr := strings.TrimSpace(errBuf.String())
+	if nativefill.IsAssistiveAccessError(stderr) || (err != nil && nativefill.IsAssistiveAccessError(err.Error())) {
+		return domain.ErrAssistiveAccess
+	}
+	if err != nil {
 		return errFillWaiting
 	}
+	if strings.TrimSpace(out.String()) == "ready" {
+		return nil
+	}
 	return errFillWaiting
+}
+
+func buildProbeScript() string {
+	return `
+global didWake
+
+on labelOf(el)
+	tell application "System Events"
+		set bits to ""
+		try
+			set bits to bits & (description of el as string) & " "
+		end try
+		try
+			set bits to bits & (title of el as string) & " "
+		end try
+		try
+			set bits to bits & (value of attribute "AXPlaceholderValue" of el as string) & " "
+		end try
+		try
+			set bits to bits & (help of el as string)
+		end try
+		return bits
+	end tell
+end labelOf
+
+on isSecure(el)
+	tell application "System Events"
+		try
+			if (role of el as string) is "AXSecureTextField" then return true
+		end try
+		try
+			if (subrole of el as string) is "AXSecureTextField" then return true
+		end try
+	end tell
+	return false
+end isSecure
+
+on isUsable(el)
+	tell application "System Events"
+		try
+			if enabled of el is false then return false
+		end try
+		try
+			set s to size of el
+			if (item 1 of s) < 2 or (item 2 of s) < 2 then return false
+		end try
+	end tell
+	return true
+end isUsable
+
+on skipField(el)
+	set bits to my labelOf(el)
+	if bits contains "token" or bits contains "Token" then return true
+	if bits contains "confirm" or bits contains "Confirm" then return true
+	if bits contains "new password" or bits contains "New Password" or bits contains "New password" then return true
+	return false
+end skipField
+
+on tryDetectUsername(theUI)
+	set wtitle to ""
+	tell application "System Events"
+		try
+			set wtitle to name of theUI as string
+		end try
+	end tell
+	if wtitle contains "Input password" then return false
+	if wtitle contains "New Password" then return false
+	if wtitle contains "Token" then return false
+
+	set everything to {}
+	try
+		tell application "System Events"
+			set everything to entire contents of theUI
+		end tell
+	on error
+		return false
+	end try
+
+	set textFields to {}
+	repeat with el in everything
+		if my isUsable(el) and not my skipField(el) and not my isSecure(el) then
+			set isText to false
+			tell application "System Events"
+				try
+					set isText to ((role of el as string) is "AXTextField")
+				end try
+			end tell
+			if isText then
+				set bits to my labelOf(el)
+				if bits contains "pass" or bits contains "Pass" then
+					-- password text field, not username
+				else
+					set end of textFields to el
+				end if
+			end if
+		end if
+	end repeat
+
+	if (count of textFields) >= 1 then
+		repeat with el in textFields
+			set bits to my labelOf(el)
+			if bits contains "user" or bits contains "User" then return true
+		end repeat
+		return true
+	end if
+	return false
+end tryDetectUsername
+
+on scanProcess(pname)
+	tell application "System Events"
+		set wins to windows of process pname
+	end tell
+	repeat with w in wins
+		if my tryDetectUsername(w) then return true
+		set shs to {}
+		tell application "System Events"
+			try
+				set shs to sheets of w
+			end try
+		end tell
+		repeat with sh in shs
+			if my tryDetectUsername(sh) then return true
+		end repeat
+	end repeat
+	return false
+end scanProcess
+
+on wakeElectron(pname)
+	tell application "System Events"
+		try
+			set value of attribute "AXManualAccessibility" of process pname to true
+		end try
+		try
+			set value of attribute "AXEnhancedUserInterface" of process pname to true
+		end try
+	end tell
+	delay 0.8
+end wakeElectron
+
+on webViewHidden(pname)
+	tell application "System Events"
+		try
+			if (value of attribute "AXEnhancedUserInterface" of process pname) is true then return false
+		end try
+	end tell
+	return true
+end webViewHidden
+
+on scanOnce()
+	repeat with wanted in {"FortiClientAgent", "FortiClient"}
+		set pname to wanted as string
+		set isUp to false
+		tell application "System Events"
+			set isUp to (exists process pname)
+		end tell
+		if isUp then
+			if pname is "FortiClient" and didWake is false and my webViewHidden(pname) then
+				set didWake to true
+				my wakeElectron(pname)
+			end if
+			if my scanProcess(pname) then return true
+		end if
+	end repeat
+	return false
+end scanOnce
+
+on run
+	set didWake to false
+	if my scanOnce() then return "ready"
+	return "waiting"
+end run
+`
 }
 
 func buildFillScript(username, password string, waitSeconds int) string {

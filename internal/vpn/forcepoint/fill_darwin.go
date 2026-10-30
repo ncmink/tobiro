@@ -52,12 +52,80 @@ func (p *Provider) FillNativeLogin(ctx context.Context, _ domain.VPNProfile, cre
 	}
 }
 
-// ProbeNativeLogin is unused by Tobiro; fill is manual via ⌘I.
-func (p *Provider) ProbeNativeLogin(_ context.Context, _ domain.VPNProfile, credential domain.Credential) error {
-	if !canFill(credential) {
+// ProbeNativeLogin reports whether Forcepoint's login window exposes a username
+// field. A nil error means the user can press the fill shortcut.
+func (p *Provider) ProbeNativeLogin(ctx context.Context, _ domain.VPNProfile, _ domain.Credential) error {
+	result, stderr, err := runProbeScript(ctx)
+	if err != nil {
+		if nativefill.IsAssistiveAccessError(stderr + err.Error()) {
+			return domain.ErrAssistiveAccess
+		}
 		return errFillWaiting
 	}
+	if strings.TrimSpace(result) == "ready" {
+		return nil
+	}
 	return errFillWaiting
+}
+
+func runProbeScript(ctx context.Context) (stdout, stderr string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, osascriptPath, "-")
+	cmd.Stdin = strings.NewReader(buildProbeScript())
+	var out, errBuf bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errBuf
+	err = cmd.Run()
+	return out.String(), errBuf.String(), err
+}
+
+func buildProbeScript() string {
+	return `
+on hasUsernameField(theUI)
+	tell application "System Events"
+		try
+			set textFields to UI elements of theUI whose role is "AXTextField"
+			if (count of textFields) >= 1 then return true
+		end try
+	end tell
+	return false
+end hasUsernameField
+
+on scanUI(theUI)
+	if my hasUsernameField(theUI) then return true
+	tell application "System Events"
+		try
+			repeat with g in groups of theUI
+				if my hasUsernameField(g) then return true
+			end repeat
+		end try
+		try
+			repeat with sh in sheets of theUI
+				if my hasUsernameField(sh) then return true
+			end repeat
+		end try
+	end tell
+	return false
+end scanUI
+
+on run
+	tell application "System Events"
+		repeat with procRef in (every process whose background only is false)
+			set pname to (name of procRef) as string
+			if pname contains "Forcepoint" or pname contains "Stonesoft" or pname contains "Sgvpn" or pname contains "sgvpn" then
+				tell procRef
+					repeat with w in windows
+						if my scanUI(w) then return "ready"
+					end repeat
+				end tell
+			end if
+		end repeat
+	end tell
+	return "waiting"
+end run
+`
 }
 
 func runFillScript(ctx context.Context, username, password string) (stdout, stderr string, err error) {

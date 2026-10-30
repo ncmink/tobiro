@@ -23,6 +23,8 @@
         <string>true</string>
         <key>NSHumanReadableCopyright</key>
         <string>{{.Info.Copyright}}</string>
+        <key>NSAppleEventsUsageDescription</key>
+        <string>Tobiro controls System Events to fill VPN login fields when you use the fill shortcut.</string>
         {{if .Info.FileAssociations}}
         <key>CFBundleDocumentTypes</key>
         <array>

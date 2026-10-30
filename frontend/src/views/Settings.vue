@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { ClearLogs, GetLogs } from '@bindings/go/main/App'
@@ -8,8 +8,10 @@ import { EventsOn } from '@bindings/runtime/runtime'
 import ProviderIcon from '@/components/ProviderIcon.vue'
 import { useTheme, type ThemePreference } from '@/lib/theme'
 import { useConnectionsStore } from '@/stores/connections'
+import { comboFromKeyboardEvent, useFillShortcutStore } from '@/stores/fillShortcut'
 
 const store = useConnectionsStore()
+const fillShortcut = useFillShortcutStore()
 const { preference, resolved, setTheme } = useTheme()
 const themes: { value: ThemePreference; label: string; description: string }[] = [
   { value: 'light', label: 'Light', description: 'A bright, clear workspace' },
@@ -19,6 +21,9 @@ const themes: { value: ThemePreference; label: string; description: string }[] =
 
 const logs = ref<logging.Entry[]>([])
 const detecting = ref(false)
+const shortcutDraft = ref('cmd+i')
+const savingShortcut = ref(false)
+const shortcutCapturing = ref(false)
 
 const bootstrap = computed(() => store.bootstrap)
 
@@ -29,12 +34,58 @@ const LEVEL_CLASS: Record<string, string> = {
 }
 
 onMounted(async () => {
+  await fillShortcut.refresh()
+  syncShortcutDraft()
   await store.loadProviderStatus()
   logs.value = await GetLogs()
   EventsOn('log:appended', (entry: logging.Entry) => {
     logs.value = [...logs.value, entry].slice(-500)
   })
 })
+
+watch(
+  () => fillShortcut.shortcut?.combo,
+  () => {
+    if (!shortcutCapturing.value) syncShortcutDraft()
+  },
+)
+
+function syncShortcutDraft() {
+  shortcutDraft.value = fillShortcut.shortcut?.combo || 'cmd+i'
+}
+
+function onShortcutFocus() {
+  shortcutCapturing.value = true
+}
+
+function onShortcutBlur() {
+  shortcutCapturing.value = false
+  syncShortcutDraft()
+}
+
+async function onShortcutKeydown(event: KeyboardEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+
+  if (event.key === 'Escape') {
+    syncShortcutDraft()
+    ;(event.target as HTMLInputElement).blur()
+    return
+  }
+
+  const combo = comboFromKeyboardEvent(event)
+  if (combo === null) return
+
+  shortcutDraft.value = combo
+  savingShortcut.value = true
+  try {
+    await fillShortcut.applyCombo(combo)
+    syncShortcutDraft()
+  } finally {
+    savingShortcut.value = false
+    ;(event.target as HTMLInputElement).blur()
+  }
+}
 
 async function redetect() {
   detecting.value = true
@@ -106,6 +157,128 @@ function capabilityList(provider: (typeof store.providerStatus)[number]) {
         </button>
       </div>
       <p class="mt-4 text-xs text-ink-faint">Your preference is saved automatically.</p>
+    </section>
+
+    <section
+      v-if="fillShortcut.supported"
+      class="rounded-2xl border border-line bg-surface-1 p-6"
+      aria-labelledby="fill-shortcut-heading"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="fill-shortcut-heading" class="text-base font-semibold text-ink">Fill login shortcut</h2>
+          <p class="mt-1 text-sm text-ink-muted">
+            Global shortcut while a supported VPN login window is open. Default is ⌘I.
+          </p>
+        </div>
+        <kbd class="rounded-lg border border-line-strong bg-surface-0 px-3 py-1.5 font-mono text-sm text-ink">
+          {{ fillShortcut.shortcut?.display || '⌘I' }}
+        </kbd>
+      </div>
+
+      <div class="mt-5">
+        <label class="block min-w-0">
+          <span class="text-xs font-medium text-ink-muted">Shortcut</span>
+          <input
+            :value="shortcutCapturing ? '' : shortcutDraft"
+            type="text"
+            readonly
+            spellcheck="false"
+            autocapitalize="off"
+            autocomplete="off"
+            class="no-drag mt-1.5 w-full cursor-pointer rounded-xl border border-line-strong bg-surface-0 px-3 py-2 font-mono text-sm text-ink outline-none transition focus:border-brand/60 focus:ring-2 focus:ring-brand/20"
+            :class="{ 'ring-2 ring-brand/20 border-brand/60': shortcutCapturing }"
+            :placeholder="shortcutCapturing ? 'Press shortcut… (Esc to cancel)' : shortcutDraft"
+            :aria-busy="savingShortcut"
+            @focus="onShortcutFocus"
+            @blur="onShortcutBlur"
+            @keydown="onShortcutKeydown"
+          />
+        </label>
+        <p v-if="savingShortcut" class="mt-2 text-xs text-ink-muted">Saving…</p>
+      </div>
+      <p class="mt-2 text-xs text-ink-faint">
+        Click the field, then press your shortcut (for example ⌘⇧L). Use at least one modifier:
+        <span class="font-mono">cmd</span>, <span class="font-mono">ctrl</span>,
+        <span class="font-mono">option</span>, or <span class="font-mono">shift</span>.
+      </p>
+
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="no-drag rounded-xl px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
+          @click="fillShortcut.reset()"
+        >
+          Reset to ⌘I
+        </button>
+        <button
+          type="button"
+          class="no-drag rounded-xl px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-ink/5 hover:text-ink"
+          @click="fillShortcut.replayIntro()"
+        >
+          Show intro again
+        </button>
+      </div>
+
+      <p v-if="fillShortcut.saveError" class="mt-3 text-sm text-bad">{{ fillShortcut.saveError }}</p>
+      <p
+        v-else-if="fillShortcut.shortcut?.registerError"
+        class="mt-3 text-sm text-warn"
+      >
+        Shortcut not active: {{ fillShortcut.shortcut.registerError }}
+      </p>
+      <p v-else-if="fillShortcut.shortcut?.registered === false" class="mt-3 text-sm text-warn">
+        Shortcut is not registered. Check permissions below.
+      </p>
+
+      <div class="mt-6 border-t border-line pt-5">
+        <h3 class="text-sm font-semibold text-ink">Permissions</h3>
+        <p class="mt-1 text-xs text-ink-muted">
+          Required on macOS for the shortcut and for typing into vendor login windows.
+        </p>
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <span
+            class="rounded-lg px-2.5 py-1 text-xs font-semibold"
+            :class="
+              fillShortcut.permissions?.accessibilityGranted
+                ? 'bg-ok/15 text-ok'
+                : 'bg-warn/15 text-warn'
+            "
+          >
+            Accessibility {{ fillShortcut.permissions?.accessibilityGranted ? 'granted' : 'needed' }}
+          </span>
+          <button
+            type="button"
+            class="no-drag text-xs font-medium text-brand hover:underline"
+            @click="fillShortcut.openPrivacy('accessibility')"
+          >
+            Open Accessibility settings
+          </button>
+          <button
+            type="button"
+            class="no-drag text-xs font-medium text-brand hover:underline"
+            @click="fillShortcut.openPrivacy('automation')"
+          >
+            Open Automation settings
+          </button>
+          <button
+            type="button"
+            class="no-drag text-xs font-medium text-brand hover:underline"
+            @click="fillShortcut.openPrivacy('listen')"
+          >
+            Open Input Monitoring settings
+          </button>
+        </div>
+        <p v-if="fillShortcut.permissions?.automationHint" class="mt-3 text-xs leading-relaxed text-ink-faint">
+          {{ fillShortcut.permissions.automationHint }}
+        </p>
+        <p
+          v-if="fillShortcut.permissions?.inputMonitoringHint"
+          class="mt-2 text-xs leading-relaxed text-ink-faint"
+        >
+          {{ fillShortcut.permissions.inputMonitoringHint }}
+        </p>
+      </div>
     </section>
 
     <!-- Credential storage -->

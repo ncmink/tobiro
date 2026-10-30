@@ -4,17 +4,21 @@ import { RouterView, useRoute, useRouter } from 'vue-router'
 
 import { TakeConnectRequest } from '@bindings/go/main/App'
 import { Environment, EventsOn } from '@bindings/runtime/runtime'
+import FillShortcutIntro from '@/components/FillShortcutIntro.vue'
+import FillLoginDetectedDialog from '@/components/FillLoginDetectedDialog.vue'
 import HostKeyDialog from '@/components/HostKeyDialog.vue'
 import OtpDialog from '@/components/OtpDialog.vue'
 import { useConnectionSharing } from '@/lib/connectionSharing'
 import { coerceSession } from '@/lib/state'
 import { useConnectionsStore } from '@/stores/connections'
+import { useFillShortcutStore } from '@/stores/fillShortcut'
 import { useSessionsStore } from '@/stores/sessions'
 
 const router = useRouter()
 const route = useRoute()
 const store = useConnectionsStore()
 const sessions = useSessionsStore()
+const fillShortcut = useFillShortcutStore()
 const { notice, dismissNotice, showFillLoginNotice } = useConnectionSharing()
 
 let statusPoll: number | undefined
@@ -42,6 +46,7 @@ onMounted(async () => {
     document.documentElement.dataset.platform = env.platform
   }
   sessions.init()
+  await fillShortcut.refresh()
   await store.loadBootstrap()
   await store.refresh()
   await sessions.refresh()
@@ -57,6 +62,12 @@ onMounted(async () => {
     if (!text) return
     showFillLoginNotice(text, payload.ok === true)
   })
+  EventsOn(
+    'fill:login_detected',
+    (payload: { profileId?: string; connectionName?: string; shortcutDisplay?: string }) => {
+      fillShortcut.showLoginDetected(payload)
+    },
+  )
 
   await collectConnectRequest()
 
@@ -102,5 +113,7 @@ onUnmounted(() => {
 
     <OtpDialog v-if="sessions.otpRequest" />
     <HostKeyDialog v-if="sessions.hostKeyRequest" />
+    <FillShortcutIntro v-if="fillShortcut.showIntro" />
+    <FillLoginDetectedDialog />
   </div>
 </template>

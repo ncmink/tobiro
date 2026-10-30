@@ -57,7 +57,9 @@ type App struct {
 	fillTargetMu        sync.Mutex
 	fillTargetProfileID string
 
-	fillHotkeyStop func()
+	fillHotkeyMu            sync.Mutex
+	fillHotkeyStop          func()
+	fillHotkeyRegisterErr   string
 }
 
 // NewApp builds the binding surface from already-wired services.
@@ -331,7 +333,11 @@ func (a *App) OpenNativeClient(profileID string, credentialID string) error {
 		return err
 	}
 	a.setNativeFillProfile(profileID)
-	return a.describe(a.vpn.OpenNativeClient(a.ctx, profileID, credentialID))
+	err := a.describe(a.vpn.OpenNativeClient(a.ctx, profileID, credentialID))
+	if err == nil {
+		go a.watchFillLoginHint(profileID)
+	}
+	return err
 }
 
 // FillNativeLogin types the chosen account when the vendor login field already
