@@ -13,7 +13,14 @@ import ForwardList from '@/components/ForwardList.vue'
 import ProviderIcon from '@/components/ProviderIcon.vue'
 import TunnelSettings from '@/components/TunnelSettings.vue'
 import { connectionId, connectionParentId, descendants, findNode, forest } from '@/lib/chain'
-import { accountToConnectWith, canConnect, errorMessage, formatDuration, isActive } from '@/lib/state'
+import {
+  accountToConnectWith,
+  canConnect,
+  connectionCredentials,
+  errorMessage,
+  formatDuration,
+  isActive,
+} from '@/lib/state'
 import { useConnectionsStore } from '@/stores/connections'
 import { useFillShortcutStore } from '@/stores/fillShortcut'
 import { useSessionsStore } from '@/stores/sessions'
@@ -27,6 +34,9 @@ const sessions = useSessionsStore()
 const fillShortcut = useFillShortcutStore()
 
 const connection = computed(() => store.byId(props.id))
+const credentials = computed(() =>
+  connection.value ? connectionCredentials(connection.value) : [],
+)
 
 const section = ref<'overview' | 'accounts' | 'settings'>('overview')
 const sections = computed(() => [
@@ -81,7 +91,7 @@ const capabilities = computed(() => connection.value?.capabilities)
 const activeAccount = computed(() => {
   const credentialId = session.value?.credentialId
   if (!credentialId || !connection.value) return null
-  return connection.value.credentials.find((c) => c.id === credentialId) ?? null
+  return credentials.value.find((c) => c.id === credentialId) ?? null
 })
 
 const endpoint = computed(() => connection.value?.endpoint ?? '')
@@ -274,7 +284,7 @@ watch(
     if (isActive(state.value)) return
     if (!target.capabilities.canConnect) return
     if (!target.capabilities.supportsPassword) return
-    if (target.credentials.length === 0) return
+    if (connectionCredentials(target).length === 0) return
     showConnectDialog.value = true
   },
   { immediate: true },
@@ -565,9 +575,9 @@ onUnmounted(() => {
         </button>
       </header>
 
-      <ul v-if="connection.credentials.length" class="divide-y divide-line">
+      <ul v-if="credentials.length" class="divide-y divide-line">
         <li
-          v-for="credential in connection.credentials"
+          v-for="credential in credentials"
           :key="credential.id"
           class="flex flex-wrap items-center gap-4 px-6 py-4"
         >

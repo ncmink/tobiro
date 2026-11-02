@@ -124,7 +124,7 @@ async function readCommand() {
     form.host = parsed.profile.host
     form.port = parsed.profile.port
     form.user = parsed.profile.ssh.user
-    form.forwards = parsed.profile.ssh.forwards.map((f) => ({
+    form.forwards = (parsed.profile.ssh.forwards ?? []).map((f) => ({
       name: f.name,
       localPort: f.localPort,
       remoteHost: f.remoteHost,

@@ -72,7 +72,7 @@ onMounted(async () => {
   syncShortcutDraft()
   applyTabFromRoute()
   await store.loadProviderStatus()
-  logs.value = await GetLogs()
+  logs.value = (await GetLogs()) ?? []
   const updateSettings = await GetUpdateSettings()
   autoCheckUpdates.value = updateSettings.autoCheckUpdates
   EventsOn('log:appended', (entry: logging.Entry) => {

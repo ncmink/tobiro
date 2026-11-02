@@ -40,7 +40,7 @@ async function loadHosts() {
   error.value = ''
   selected.value = new Set()
   try {
-    hosts.value = await ListSSHConfigHosts()
+    hosts.value = (await ListSSHConfigHosts()) ?? []
   } catch (err) {
     error.value = errorMessage(err, 'Could not read your SSH config')
     hosts.value = []

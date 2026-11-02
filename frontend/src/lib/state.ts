@@ -1,5 +1,10 @@
 import type { domain, main } from '@/lib/bindings'
 
+/** Wails v3 bindings use `T | null` for Go slices; treat null as empty. */
+export function connectionCredentials(connection: main.ConnectionView): domain.CredentialView[] {
+  return connection.credentials ?? []
+}
+
 /** Presentation metadata for the Go connection state machine. */
 export type ConnectionState =
   | 'disconnected'
@@ -55,7 +60,7 @@ export function canConnect(connection: main.ConnectionView): boolean {
   const capabilities = connection.capabilities
   if (!capabilities.canConnect) return false
   if (!capabilities.supportsPassword || capabilities.accountOptional) return true
-  return connection.credentials.length > 0
+  return connectionCredentials(connection).length > 0
 }
 
 /**
@@ -65,9 +70,10 @@ export function canConnect(connection: main.ConnectionView): boolean {
  * without an account, which is how a tunnel reaches the ssh-agent.
  */
 export function accountToConnectWith(connection: main.ConnectionView): string | null {
-  if (!connection.capabilities.supportsPassword) return connection.credentials[0]?.id ?? ''
-  if (connection.credentials.length === 1) return connection.credentials[0].id
-  if (connection.credentials.length === 0 && connection.capabilities.accountOptional) return ''
+  const credentials = connectionCredentials(connection)
+  if (!connection.capabilities.supportsPassword) return credentials[0]?.id ?? ''
+  if (credentials.length === 1) return credentials[0].id
+  if (credentials.length === 0 && connection.capabilities.accountOptional) return ''
   return null
 }
 

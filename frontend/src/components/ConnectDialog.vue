@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 
 import type { main } from '@/lib/bindings'
+import { connectionCredentials } from '@/lib/state'
 import AppModal from '@/components/AppModal.vue'
 import CredentialSelector from '@/components/CredentialSelector.vue'
 
@@ -23,18 +24,20 @@ const subtitle = computed(() =>
 )
 const actionLabel = computed(() => (fill.value ? 'Fill login' : 'Connect'))
 
+const credentials = computed(() => connectionCredentials(props.connection))
+
 // Preselect the last account used on this profile, falling back to the
 // profile default. Both are tracked by credential UUID, never by username.
 const selected = ref(
-  props.connection.suggestedCredentialId || props.connection.credentials[0]?.id || '',
+  props.connection.suggestedCredentialId || connectionCredentials(props.connection)[0]?.id || '',
 )
 </script>
 
 <template>
   <AppModal :title="title" :subtitle="subtitle" @close="emit('close')">
-    <CredentialSelector v-model="selected" :credentials="connection.credentials" />
+    <CredentialSelector v-model="selected" :credentials="credentials" />
 
-    <p v-if="!connection.credentials.length" class="text-sm text-ink-muted">
+    <p v-if="!credentials.length" class="text-sm text-ink-muted">
       This connection has no accounts yet.
     </p>
 

@@ -7,7 +7,7 @@ import ConnectionStatus from '@/components/ConnectionStatus.vue'
 import ForwardList from '@/components/ForwardList.vue'
 import ProviderIcon from '@/components/ProviderIcon.vue'
 import { descendants, type ChainNode } from '@/lib/chain'
-import { canConnect, formatDuration, isActive, stateStyle } from '@/lib/state'
+import { canConnect, connectionCredentials, formatDuration, isActive, stateStyle } from '@/lib/state'
 import { canFillNativeLogin } from '@/lib/nativeFill'
 import { useConnectionsStore } from '@/stores/connections'
 import { useFillShortcutStore } from '@/stores/fillShortcut'
@@ -104,11 +104,11 @@ const accountLabel = computed(() => {
   }
   const id = session.value?.credentialId
   if (!id) return 'Signed in via vendor client'
-  return props.connection.credentials.find((c) => c.id === id)?.label ?? 'Unknown account'
+  return connectionCredentials(props.connection).find((c) => c.id === id)?.label ?? 'Unknown account'
 })
 
 const capabilities = computed(() => props.connection.capabilities)
-const hasAccounts = computed(() => props.connection.credentials.length > 0)
+const hasAccounts = computed(() => connectionCredentials(props.connection).length > 0)
 const needsAccount = computed(
   () => capabilities.value.supportsPassword !== false && !capabilities.value.accountOptional,
 )

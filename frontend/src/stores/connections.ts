@@ -116,8 +116,8 @@ export const useConnectionsStore = defineStore('connections', () => {
     loading.value = true
     try {
       const [list, groupList] = await Promise.all([ListConnections(), ListGroups()])
-      connections.value = list
-      groups.value = groupList
+      connections.value = list ?? []
+      groups.value = groupList ?? []
       loaded.value = true
       error.value = ''
     } catch (err) {
@@ -168,13 +168,14 @@ export const useConnectionsStore = defineStore('connections', () => {
 
   /** Hides or reveals a whole group. Nothing is deleted — this is presentation. */
   async function setGroupHidden(name: string, hidden: boolean) {
-    groups.value = await SetGroupHidden(name, hidden)
+    groups.value = (await SetGroupHidden(name, hidden)) ?? []
     await refresh()
   }
 
   async function loadProviderStatus(reDetect = false) {
     try {
-      providerStatus.value = reDetect ? await RefreshProviderDetection() : await ListProviderStatus()
+      providerStatus.value =
+        (reDetect ? await RefreshProviderDetection() : await ListProviderStatus()) ?? []
     } catch (err) {
       error.value = errorMessage(err, 'Could not detect VPN clients')
     }
