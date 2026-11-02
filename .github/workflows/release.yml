@@ -53,7 +53,7 @@ jobs:
           echo "APP_VERSION=${VERSION#v}" >> "$GITHUB_ENV"
 
       - name: Wire biebie-protocol for CI
-        run: go mod edit -replace github.com/ncmink/biebie-protocol=${{ github.workspace }}/biebie-protocol
+        run: go mod edit -replace github.com/ncmink/biebie-protocol=./biebie-protocol
 
       - name: Install wails3
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
@@ -205,7 +205,7 @@ jobs:
 
       - name: Wire biebie-protocol for CI
         shell: bash
-        run: go mod edit -replace github.com/ncmink/biebie-protocol=${{ github.workspace }}/biebie-protocol
+        run: go mod edit -replace github.com/ncmink/biebie-protocol=./biebie-protocol
 
       - name: Install NSIS
         shell: pwsh
