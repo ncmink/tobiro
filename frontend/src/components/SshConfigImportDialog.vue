@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { ListSSHConfigHosts } from '@bindings/go/main/App'
-import type { main } from '@bindings/go/models'
+import { ListSSHConfigHosts } from '@/api'
+import type { main } from '@/lib/bindings'
 import AppModal from '@/components/AppModal.vue'
 import { errorMessage } from '@/lib/state'
 import { useConnectionsStore } from '@/stores/connections'

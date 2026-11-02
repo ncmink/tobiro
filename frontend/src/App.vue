@@ -2,8 +2,7 @@
 import { onMounted, onUnmounted, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 
-import { TakeConnectRequest } from '@bindings/go/main/App'
-import { Environment, EventsOn } from '@bindings/runtime/runtime'
+import { Environment, EventsOn, FrontendReady, TakeConnectRequest } from '@/api'
 import FillShortcutIntro from '@/components/FillShortcutIntro.vue'
 import FillLoginDetectedDialog from '@/components/FillLoginDetectedDialog.vue'
 import HostKeyDialog from '@/components/HostKeyDialog.vue'
@@ -43,13 +42,17 @@ watch(
 onMounted(async () => {
   if ('runtime' in window) {
     const env = await Environment()
-    document.documentElement.dataset.platform = env.platform
+    document.documentElement.dataset.platform = env.OS.toLowerCase()
   }
   sessions.init()
   await fillShortcut.refresh()
   await store.loadBootstrap()
   await store.refresh()
   await sessions.refresh()
+
+  if ('runtime' in window) {
+    await FrontendReady()
+  }
 
   EventsOn('profile:changed', () => void store.refresh())
   EventsOn('session:changed', (raw: unknown) => {

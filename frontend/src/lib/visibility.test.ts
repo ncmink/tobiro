@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import type { main } from '@bindings/go/models'
+import type { main } from '@/lib/bindings'
 
 import { connectionMap, isDashboardVisible } from './visibility.ts'
 

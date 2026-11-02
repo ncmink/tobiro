@@ -8,8 +8,8 @@ import {
   ResetFillShortcut,
   SetFillShortcut,
   ShowFillShortcutIntro,
-} from '@bindings/go/main/App'
-import type { main } from '@bindings/go/models'
+} from '@/api'
+import type { main } from '@/lib/bindings'
 import { errorMessage } from '@/lib/state'
 
 export const useFillShortcutStore = defineStore('fillShortcut', () => {

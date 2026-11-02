@@ -23,8 +23,8 @@ import {
   SetClientStartup,
   UpdateConnection,
   UpdateCredential,
-} from '@bindings/go/main/App'
-import type { domain, main } from '@bindings/go/models'
+} from '@/api'
+import type { domain, main } from '@/lib/bindings'
 import { connectionMap, isDashboardVisible } from '@/lib/visibility'
 import { errorMessage } from '@/lib/state'
 

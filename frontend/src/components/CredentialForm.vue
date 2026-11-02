@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 
-import type { domain } from '@bindings/go/models'
+import type { domain } from '@/lib/bindings'
 import AppModal from '@/components/AppModal.vue'
 import AppSelect from '@/components/AppSelect.vue'
 
@@ -36,7 +36,7 @@ const form = reactive({
 // SSH server, so the list is narrowed rather than offering both and failing on
 // save.
 const available = computed(() =>
-  props.authMethods.filter((m) => m.implemented && (m.kinds ?? []).includes(props.kind)),
+  props.authMethods.filter((m) => m.implemented && (m.kinds ?? []).includes(props.kind as domain.AccessKind)),
 )
 const selected = computed(() => available.value.find((m) => m.id === form.authMethod))
 const needsSecret = computed(() => selected.value?.needsSecret ?? true)

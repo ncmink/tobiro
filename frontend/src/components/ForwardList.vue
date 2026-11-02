@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-import type { domain } from '@bindings/go/models'
+import type { domain } from '@/lib/bindings'
 
 const props = defineProps<{
   forwards: domain.PortForward[]

@@ -144,10 +144,3 @@ func (a *App) fillShortcutDisplay() string {
 	}
 	return hotkeyspec.FormatDisplay(combo, runtime.GOOS == "darwin")
 }
-
-func (a *App) refreshApplicationMenu() {
-	if a.ctx == nil {
-		return
-	}
-	refreshApplicationMenu(a.ctx, a)
-}

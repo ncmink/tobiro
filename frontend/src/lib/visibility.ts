@@ -1,4 +1,4 @@
-import type { main } from '@bindings/go/models'
+import type { main } from '@/lib/bindings'
 
 /**
  * Whether a connection should appear on the dashboard for the current hidden-group

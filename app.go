@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/wailsapp/wails/v3/pkg/application"
+
 	"tobiro/internal/access"
 	"tobiro/internal/credential"
 	"tobiro/internal/domain"
@@ -18,6 +20,8 @@ import (
 	"tobiro/internal/sshtunnel"
 	"tobiro/internal/store"
 	"tobiro/internal/vpn"
+
+	"github.com/wailsapp/wails/v3/pkg/updater"
 )
 
 // appVersion is stamped into the Settings screen and release checks.
@@ -30,6 +34,8 @@ const appVersion = "0.0.1"
 // VPN manager into a broader customer access workspace.
 type App struct {
 	ctx context.Context
+
+	updater *updater.Updater
 
 	profiles    *profile.Service
 	credentials *credential.Service
@@ -92,10 +98,9 @@ func NewApp(
 	}
 }
 
-// startup captures the Wails context.
-func (a *App) startup(ctx context.Context) {
+// ServiceStartup runs once Wails has started the application.
+func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	a.ctx = ctx
-	a.bridge.attach(ctx)
 	a.log.Info("Tobiro %s started", appVersion)
 
 	available, detail := a.secrets.Available()
@@ -115,6 +120,7 @@ func (a *App) startup(ctx context.Context) {
 
 	a.vpn.StartWatching(ctx)
 	a.startFillHotkey()
+	return nil
 }
 
 // ---------------------------------------------------------------- bootstrap

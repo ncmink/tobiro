@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-import type { main } from '@bindings/go/models'
+import type { main } from '@/lib/bindings'
 import AppModal from '@/components/AppModal.vue'
 import CredentialSelector from '@/components/CredentialSelector.vue'
 

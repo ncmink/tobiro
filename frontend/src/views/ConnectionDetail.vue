@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
-import type { domain, main } from '@bindings/go/models'
+import type { domain, main } from '@/lib/bindings'
 import ConnectDialog from '@/components/ConnectDialog.vue'
 import ConnectionForm from '@/components/ConnectionForm.vue'
 import ConnectionStatus from '@/components/ConnectionStatus.vue'

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"tobiro/internal/domain"
 	"tobiro/internal/transfer"
@@ -13,17 +13,6 @@ import (
 
 const shareFileName = "biebie-connections.yaml"
 
-var shareFilters = []wailsruntime.FileFilter{
-	{DisplayName: "Tobiro connections (*.yaml, *.yml)", Pattern: "*.yaml;*.yml"},
-}
-
-// ExportConnections writes every connection to a YAML file the user picks, so
-// it can be handed to a colleague. Passwords are never part of the file — the
-// recipient adds their own after importing.
-//
-// Connections kept in hidden groups are left out, along with anything that
-// requires them, so a share file only describes what the sender still shows on
-// the dashboard by default.
 func (a *App) ExportConnections() (ExportResultView, error) {
 	all := a.profiles.List()
 	if len(all) == 0 {
@@ -39,12 +28,13 @@ func (a *App) ExportConnections() (ExportResultView, error) {
 		return ExportResultView{}, err
 	}
 
-	path, err := wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
-		Title:                "Export connections",
-		DefaultFilename:      shareFileName,
-		CanCreateDirectories: true,
-		Filters:              shareFilters,
-	})
+	dialog := application.Get().Dialog.SaveFile()
+	dialog.SetMessage("Export connections")
+	dialog.SetFilename(shareFileName)
+	dialog.CanCreateDirectories(true)
+	dialog.AddFilter("Tobiro connections", "*.yaml;*.yml")
+
+	path, err := dialog.PromptForSingleSelection()
 	if err != nil {
 		return ExportResultView{}, fmt.Errorf("could not open the save dialog: %w", err)
 	}
@@ -60,15 +50,12 @@ func (a *App) ExportConnections() (ExportResultView, error) {
 	return ExportResultView{File: path, Connections: len(profiles)}, nil
 }
 
-// ImportConnections adds the connections from an exported YAML file.
-//
-// A connection whose name already exists is skipped rather than merged or
-// duplicated, so re-importing a file a colleague updated is safe.
 func (a *App) ImportConnections() (ImportResultView, error) {
-	path, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
-		Title:   "Import connections",
-		Filters: shareFilters,
-	})
+	dialog := application.Get().Dialog.OpenFile()
+	dialog.SetMessage("Import connections")
+	dialog.AddFilter("Tobiro connections", "*.yaml;*.yml")
+
+	path, err := dialog.PromptForSingleSelection()
 	if err != nil {
 		return ImportResultView{}, fmt.Errorf("could not open the file dialog: %w", err)
 	}
@@ -85,8 +72,6 @@ func (a *App) ImportConnections() (ImportResultView, error) {
 		return ImportResultView{}, err
 	}
 
-	// Every name on this machine, whether it arrived just now or was already
-	// here, so a connection can be told which one it needs first.
 	byName := make(map[string]string)
 	for _, p := range a.profiles.List() {
 		byName[strings.ToLower(strings.TrimSpace(p.Name))] = p.ID
@@ -127,8 +112,6 @@ func (a *App) ImportConnections() (ImportResultView, error) {
 	return result, nil
 }
 
-// filterProfilesForExport drops connections in hidden groups and anything that
-// depends on them through requires, matching dashboard visibility.
 func filterProfilesForExport(profiles []domain.VPNProfile, groupHidden func(string) bool) []domain.VPNProfile {
 	if len(profiles) == 0 {
 		return nil
@@ -170,13 +153,6 @@ func filterProfilesForExport(profiles []domain.VPNProfile, groupHidden func(stri
 	return out
 }
 
-// applyRequirements records "needs this up first" in a second pass, once every
-// name in the file has an identifier on this machine.
-//
-// Only the connections this import created are touched: one that was skipped
-// because it already existed keeps whatever order the user set up here. A
-// reference to a name that is nowhere to be found leaves the connection
-// standing alone, which is worth a log line but not a failed import.
 func (a *App) applyRequirements(connections []transfer.Connection, byName, fresh map[string]string) {
 	for _, conn := range connections {
 		needs := strings.TrimSpace(conn.Requires)

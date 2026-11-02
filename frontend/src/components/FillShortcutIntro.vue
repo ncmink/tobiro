@@ -2,7 +2,7 @@
 import { RouterLink } from 'vue-router'
 
 import AppModal from '@/components/AppModal.vue'
-import { DismissFillShortcutIntro, OpenPrivacySettings } from '@bindings/go/main/App'
+import { DismissFillShortcutIntro, OpenPrivacySettings } from '@/api'
 import { useFillShortcutStore } from '@/stores/fillShortcut'
 
 const store = useFillShortcutStore()

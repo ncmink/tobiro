@@ -2,9 +2,9 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
-import { ClearLogs, GetLogs } from '@bindings/go/main/App'
-import type { logging } from '@bindings/go/models'
-import { EventsOn } from '@bindings/runtime/runtime'
+import { CheckForUpdate, ClearLogs, GetLogs, GetUpdateSettings, SetAutoCheckUpdates } from '@/api'
+import type { logging } from '@/lib/bindings'
+import { EventsOn } from '@/api'
 import ProviderIcon from '@/components/ProviderIcon.vue'
 import { useTheme, type ThemePreference } from '@/lib/theme'
 import { useConnectionsStore } from '@/stores/connections'
@@ -39,6 +39,8 @@ const detecting = ref(false)
 const shortcutDraft = ref('cmd+i')
 const savingShortcut = ref(false)
 const shortcutCapturing = ref(false)
+const autoCheckUpdates = ref(true)
+const checkingUpdate = ref(false)
 
 const bootstrap = computed(() => store.bootstrap)
 
@@ -71,6 +73,8 @@ onMounted(async () => {
   applyTabFromRoute()
   await store.loadProviderStatus()
   logs.value = await GetLogs()
+  const updateSettings = await GetUpdateSettings()
+  autoCheckUpdates.value = updateSettings.autoCheckUpdates
   EventsOn('log:appended', (entry: logging.Entry) => {
     logs.value = [...logs.value, entry].slice(-500)
   })
@@ -93,6 +97,20 @@ watch(
 
 function syncShortcutDraft() {
   shortcutDraft.value = fillShortcut.shortcut?.combo || 'cmd+i'
+}
+
+async function onAutoCheckUpdatesChange(enabled: boolean) {
+  autoCheckUpdates.value = enabled
+  await SetAutoCheckUpdates(enabled)
+}
+
+async function onCheckForUpdates() {
+  checkingUpdate.value = true
+  try {
+    await CheckForUpdate()
+  } finally {
+    checkingUpdate.value = false
+  }
 }
 
 function onShortcutFocus() {
@@ -298,6 +316,32 @@ function capabilityList(provider: (typeof store.providerStatus)[number]) {
               </button>
             </div>
             <p class="mt-4 text-xs text-ink-faint">Your preference is saved automatically.</p>
+          </section>
+
+          <hr class="border-line" />
+
+          <section aria-labelledby="updates-heading">
+            <h2 id="updates-heading" class="text-base font-semibold text-ink">Updates</h2>
+            <p class="mt-1 text-sm text-ink-muted">
+              Tobiro checks GitHub Releases and installs signed updates in place when a newer version is available.
+            </p>
+            <label class="mt-4 flex cursor-pointer items-start gap-3">
+              <input
+                v-model="autoCheckUpdates"
+                type="checkbox"
+                class="mt-1"
+                @change="onAutoCheckUpdatesChange(($event.target as HTMLInputElement).checked)"
+              />
+              <span class="text-sm text-ink-muted">Check for updates automatically (about once a day)</span>
+            </label>
+            <button
+              type="button"
+              class="btn-secondary no-drag mt-4"
+              :disabled="checkingUpdate"
+              @click="onCheckForUpdates"
+            >
+              {{ checkingUpdate ? 'Checking…' : 'Check for updates now' }}
+            </button>
           </section>
 
           <hr class="border-line" />

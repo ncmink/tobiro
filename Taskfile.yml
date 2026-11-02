@@ -1,0 +1,78 @@
+version: '3'
+
+vars:
+  APP_NAME: "Tobiro"
+  BIN_DIR: "bin"
+  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 5173}}'
+  # Target OS for build/package/run. Defaults to the host OS, and is overridden
+  # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
+  # tasks below dispatch to the matching platform Taskfile via this variable.
+  GOOS: '{{.GOOS | default OS}}'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: "{{.GOOS}}:build"
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: "{{.GOOS}}:package"
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: "{{.GOOS}}:run"
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      # Both sweeps have to happen out here, around `wails3 dev` rather than
+      # inside it. The dev command refuses to start when the Vite port is taken,
+      # and it decides that before it runs a single task from this file, so a
+      # sweep placed among the dev tasks it launches would never get the chance
+      # to clear a leftover from the run before.
+      #
+      # The deferred one covers a run ended by closing the terminal, which the
+      # dev command does not survive long enough to tidy up after.
+      - task: "common:dev:port:free"
+      - defer: { task: "common:dev:port:free" }
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  dev:stop:
+    summary: Stops a dev session, for when Ctrl+C in its terminal does nothing
+    cmds:
+      - task: "common:dev:stop"
+
+  setup:docker:
+    summary: Builds Docker image for cross-compilation (~800MB download)
+    cmds:
+      - task: common:setup:docker
+
+  build:server:
+    summary: Builds the application in server mode (no GUI, HTTP server only)
+    cmds:
+      - task: common:build:server
+
+  run:server:
+    summary: Runs the application in server mode
+    cmds:
+      - task: common:run:server
+
+  build:docker:
+    summary: Builds a Docker image for server mode deployment
+    cmds:
+      - task: common:build:docker
+
+  run:docker:
+    summary: Builds and runs the Docker image
+    cmds:
+      - task: common:run:docker

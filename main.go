@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
+
+	"github.com/ncmink/biebie-protocol/deeplink"
 
 	"tobiro/internal/access"
 	"tobiro/internal/credential"
@@ -31,50 +34,105 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-//go:embed build/appicon.png
-var appIcon []byte
+const mainWindow = "main"
+
+const singleInstanceID = "net.tobiro.access"
 
 func main() {
-	app, err := buildApp()
+	appCore, err := buildApp()
 	if err != nil {
 		log.Fatalf("Tobiro failed to start: %v", err)
 	}
 
-	err = wails.Run(&options.App{
+	app := application.New(application.Options{
+		Name:        "Tobiro",
+		Description: "Desktop access manager for DevOps engineers.",
+		Services: []application.Service{
+			application.NewService(appCore),
+		},
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(assets),
+		},
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID: singleInstanceID,
+			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
+				presentMainWindow()
+				for _, arg := range data.Args {
+					if deeplink.Scheme(arg) == deeplink.SchemeAccess {
+						appCore.handleDeepLink(arg)
+						return
+					}
+				}
+				presentMainWindow()
+			},
+		},
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
+	})
+
+	configureUpdater(app)
+	appCore.updater = app.Updater
+
+	app.Event.OnApplicationEvent(events.Common.ApplicationLaunchedWithUrl, func(event *application.ApplicationEvent) {
+		if link := event.Context().URL(); link != "" {
+			appCore.handleDeepLink(link)
+		}
+	})
+
+	app.OnShutdown(func() {
+		appCore.shutdown(context.Background())
+	})
+
+	app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:             mainWindow,
 		Title:            "Tobiro",
 		Width:            1180,
 		Height:           780,
 		MinWidth:         960,
 		MinHeight:        640,
-		AssetServer:      &assetserver.Options{Assets: assets},
-		BackgroundColour: &options.RGBA{R: 20, G: 21, B: 26, A: 1},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
-		Mac: &mac.Options{
-			TitleBar: mac.TitleBarHiddenInset(),
-			About: &mac.AboutInfo{
-				Title:   "Tobiro",
-				Icon:    appIcon,
-				Message: "Desktop access manager for DevOps engineers.\nPart of the biebie.net product family.",
-			},
-			// macOS hands a tobiro:// URL to the instance that is already
-			// running, so this is how a click in Biebie Kube arrives.
-			OnUrlOpen: app.handleDeepLink,
+		URL:              "/",
+		BackgroundColour: application.NewRGB(20, 21, 26),
+		Mac: application.MacWindow{
+			TitleBar:                application.MacTitleBarHiddenInset,
+			InvisibleTitleBarHeight: 44,
 		},
-		// Elsewhere a deep link is delivered by launching the application again
-		// with the URL in its arguments. One instance must win, both so the URL
-		// reaches the window the user is looking at and so two processes do not
-		// contend for the same local endpoint.
-		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId:               "net.tobiro.access",
-			OnSecondInstanceLaunch: app.handleSecondInstance,
-		},
-		Menu: applicationMenu(app),
-		Bind: []interface{}{app},
 	})
-	if err != nil {
+
+	if link := deepLinkFromArgs(os.Args[1:]); link != "" {
+		appCore.handleDeepLink(link)
+	}
+
+	appMenu := buildApplicationMenu(appCore)
+	app.Menu.SetApplicationMenu(appMenu)
+	appMenu.Update()
+
+	if err := app.Run(); err != nil {
 		log.Fatalf("Tobiro exited with an error: %v", err)
 	}
+}
+
+func deepLinkFromArgs(args []string) string {
+	for _, arg := range args {
+		if strings.EqualFold(deeplink.Scheme(arg), deeplink.SchemeAccess) {
+			return arg
+		}
+	}
+	return ""
+}
+
+func presentMainWindow() {
+	wails := application.Get()
+	if wails == nil {
+		return
+	}
+	window, ok := wails.Window.GetByName(mainWindow)
+	if !ok {
+		return
+	}
+	window.Show()
+	window.UnMinimise()
+	window.Focus()
 }
 
 // buildApp is the composition root: it wires storage, security, services and
@@ -100,9 +158,6 @@ func buildApp() (*App, error) {
 	profiles := profile.NewService(dataStore)
 	credentials := credential.NewService(dataStore, secrets, logger)
 
-	// Adapters register themselves here. Adding a vendor (Cisco Secure Client,
-	// GlobalProtect, OpenVPN, WireGuard, AWS Client VPN) means writing an
-	// adapter and adding one line — the manager stays vendor-agnostic.
 	registry := vpn.NewRegistry()
 	registry.Register(forcepoint.New())
 	registry.Register(ivanti.New())
@@ -115,8 +170,6 @@ func buildApp() (*App, error) {
 	vpnManager := vpn.NewManager(registry, profiles, credentials, sessions, logger)
 	vpnManager.SetPrompter(bridge)
 
-	// SSH tunnels are a peer of the vendor clients, not one of them: there is
-	// no adapter to register because there is no installed client to drive.
 	tunnels := sshtunnel.NewManager(profiles, credentials, sessions, logger)
 	tunnels.SetPrompter(bridge)
 
@@ -125,9 +178,6 @@ func buildApp() (*App, error) {
 	return NewApp(profiles, credentials, sessions, router, vpnManager, tunnels, registry, secrets, dataStore, logger, bridge), nil
 }
 
-// resolveSecretStore prefers the OS credential store and degrades to an
-// in-memory store when it is unavailable (headless Linux, CI). Either way, a
-// password is never written to application data.
 func resolveSecretStore(logger *logging.Logger) security.SecureCredentialStore {
 	osStore := keychain.New()
 	if available, _ := osStore.Available(); available {

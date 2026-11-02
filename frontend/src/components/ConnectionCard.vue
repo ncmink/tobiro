@@ -2,7 +2,7 @@
 import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
-import type { main } from '@bindings/go/models'
+import type { main } from '@/lib/bindings'
 import ConnectionStatus from '@/components/ConnectionStatus.vue'
 import ForwardList from '@/components/ForwardList.vue'
 import ProviderIcon from '@/components/ProviderIcon.vue'
