@@ -11,7 +11,6 @@ import (
 	bctx "github.com/ncmink/biebie-protocol/context"
 	"github.com/ncmink/biebie-protocol/deeplink"
 	"github.com/google/uuid"
-	"github.com/wailsapp/wails/v2/pkg/options"
 
 	"tobiro/internal/peer"
 )
@@ -231,21 +230,6 @@ func (a *App) handleDeepLink(raw string) {
 	// written: the window has to open a connection, and a name is not something
 	// it can look one up by.
 	a.requestConnect(resolved.ID)
-}
-
-// handleSecondInstance honours a deep link on Windows and Linux, where the URL
-// is delivered by launching the application again rather than to the process
-// that already holds the window.
-func (a *App) handleSecondInstance(data options.SecondInstanceData) {
-	for _, arg := range data.Args {
-		if deeplink.Scheme(arg) == deeplink.SchemeAccess {
-			a.handleDeepLink(arg)
-			return
-		}
-	}
-	// Launched again with nothing to act on, which is a user double-clicking the
-	// application. Showing the window they were reaching for is the whole job.
-	a.bridge.present()
 }
 
 // connectTarget reads the profile a connect link names.

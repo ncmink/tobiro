@@ -1,4 +1,4 @@
-import type { main } from '@bindings/go/models'
+import type { main } from '@/lib/bindings'
 
 /** True when the user can press Fill after the vendor login form is on screen. */
 export function canFillNativeLogin(connection: main.ConnectionView): boolean {

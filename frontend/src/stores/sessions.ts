@@ -10,9 +10,9 @@ import {
   RefreshStatus,
   SetNativeFillProfile,
   SubmitOTP,
-} from '@bindings/go/main/App'
-import type { domain } from '@bindings/go/models'
-import { EventsOn } from '@bindings/runtime/runtime'
+} from '@/api'
+import type { domain } from '@/lib/bindings'
+import { EventsOn } from '@/api'
 import { errorMessage, isActive, coerceSession } from '@/lib/state'
 
 /** Emitted by Go when authentication pauses for a one-time code. */

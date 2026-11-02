@@ -2,21 +2,16 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"runtime"
-	"strings"
+	"errors"
+	"log"
 	"time"
 
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/updater"
 
-	"tobiro/internal/domain"
 	"tobiro/internal/store"
 	"tobiro/internal/update"
 )
 
-const updateCheckTimeout = 45 * time.Second
-
-// GetUpdateSettings reports whether Tobiro checks GitHub Releases at startup.
 func (a *App) GetUpdateSettings() UpdateSettingsView {
 	var auto bool
 	a.store.Read(func(d *store.Data) {
@@ -25,7 +20,6 @@ func (a *App) GetUpdateSettings() UpdateSettingsView {
 	return UpdateSettingsView{AutoCheckUpdates: auto}
 }
 
-// SetAutoCheckUpdates enables or disables automatic release checks.
 func (a *App) SetAutoCheckUpdates(enabled bool) error {
 	return a.store.Update(func(d *store.Data) error {
 		d.AutoCheckUpdates = enabled
@@ -33,62 +27,38 @@ func (a *App) SetAutoCheckUpdates(enabled bool) error {
 	})
 }
 
-// FrontendReady is called once the UI is listening for events. It may run a
-// background release check when due.
+// FrontendReady is called once the UI is listening. It may run a background
+// release check when due.
 func (a *App) FrontendReady() {
-	a.maybeAutoCheckForUpdate()
-}
-
-// CheckForUpdate contacts GitHub and reports whether a newer release exists.
-func (a *App) CheckForUpdate() (UpdateCheckView, error) {
-	return a.runUpdateCheck(true)
-}
-
-// OpenUpdateURL opens a release or download link in the system browser.
-func (a *App) OpenUpdateURL(url string) error {
-	url = strings.TrimSpace(url)
-	if url == "" {
-		return fmt.Errorf("no update link to open")
-	}
-	if a.ctx == nil {
-		return fmt.Errorf("application is not ready")
-	}
-	wailsruntime.BrowserOpenURL(a.ctx, url)
-	return nil
-}
-
-func (a *App) maybeAutoCheckForUpdate() {
 	var auto bool
-	var lastCheck string
 	a.store.Read(func(d *store.Data) {
 		auto = d.AutoCheckUpdates
-		lastCheck = d.LastUpdateCheckAt
 	})
 	if !auto {
 		return
 	}
-	if !update.DueForAutoCheck(lastCheck, time.Now()) {
+	if !a.dueForAutoUpdateCheck() {
 		return
 	}
-	go func() {
-		view, err := a.runUpdateCheck(false)
-		if err != nil {
-			a.log.Warn("Update check: %v", err)
-			return
-		}
-		if !view.UpdateAvailable {
-			return
-		}
-		a.notifyUpdateAvailable(view)
-	}()
+	go a.runUpdateCheck(false)
 }
 
-func (a *App) notifyUpdateAvailable(view UpdateCheckView) {
-	if a.bridge == nil {
-		return
+// CheckForUpdate opens the Wails update window and stages a newer release when
+// one exists. The call returns once the check has started.
+func (a *App) CheckForUpdate() error {
+	if a.updater == nil || a.updater.State() == updater.StateUnconfigured {
+		return errors.New("checking for updates is not available in this build")
 	}
-	a.bridge.present()
-	a.bridge.Notify(domain.EventUpdateAvailable, view)
+	go a.runUpdateCheck(true)
+	return nil
+}
+
+func (a *App) dueForAutoUpdateCheck() bool {
+	var lastCheck string
+	a.store.Read(func(d *store.Data) {
+		lastCheck = d.LastUpdateCheckAt
+	})
+	return update.DueForAutoCheck(lastCheck, time.Now())
 }
 
 func (a *App) recordUpdateCheck(now time.Time) {
@@ -100,36 +70,25 @@ func (a *App) recordUpdateCheck(now time.Time) {
 	}
 }
 
-func (a *App) runUpdateCheck(interactive bool) (UpdateCheckView, error) {
+func (a *App) runUpdateCheck(interactive bool) {
+	if a.updater == nil || a.updater.State() == updater.StateUnconfigured {
+		return
+	}
+
 	a.recordUpdateCheck(time.Now())
 
-	view := UpdateCheckView{Current: appVersion}
-	ctx, cancel := context.WithTimeout(a.ctx, updateCheckTimeout)
-	defer cancel()
-
-	release, err := update.FetchLatest(ctx, update.Repository, update.NewHTTPClient())
-	if err != nil {
-		view.Message = err.Error()
-		if interactive {
-			return view, a.describe(err)
+	if interactive {
+		if err := a.updater.CheckAndInstall(context.Background()); err != nil {
+			log.Printf("update: %v", err)
 		}
-		return view, err
+		return
 	}
 
-	latest := strings.TrimPrefix(strings.TrimSpace(release.TagName), "v")
-	view.Latest = latest
-	view.ReleasePage = release.HTMLURL
-	view.DownloadURL = update.PickAssetURL(runtime.GOOS, runtime.GOARCH, release.Assets)
-	if view.DownloadURL == "" {
-		view.DownloadURL = release.HTMLURL
+	rel, err := a.updater.Check(context.Background())
+	if err != nil || rel == nil {
+		return
 	}
-
-	if update.CompareVersions(appVersion, latest) >= 0 {
-		view.Message = "You're on the latest version."
-		return view, nil
+	if err := a.updater.CheckAndInstall(context.Background()); err != nil {
+		log.Printf("update: %v", err)
 	}
-
-	view.UpdateAvailable = true
-	view.Message = fmt.Sprintf("Tobiro %s is available.", release.TagName)
-	return view, nil
 }

@@ -1,69 +1,90 @@
 package main
 
 import (
-	"context"
 	"runtime"
 
-	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"tobiro/internal/hotkeyspec"
 )
 
-func applicationMenu(app *App) *menu.Menu {
-	m := menu.NewMenu()
-	m.Append(menu.AppMenu())
-	m.Append(menu.EditMenu())
+func buildApplicationMenu(app *App) *application.Menu {
+	menu := application.NewMenu()
 
-	conn := m.AddSubmenu("Connection")
+	appMenu := menu.AddSubmenu("Tobiro")
+	appMenu.AddRole(application.About)
+	appMenu.AddSeparator()
+	appMenu.Add("Check for Updates…").OnClick(func(_ *application.Context) {
+		go func() { _ = app.CheckForUpdate() }()
+	})
+	appMenu.AddSeparator()
+	appMenu.AddRole(application.ServicesMenu)
+	appMenu.AddSeparator()
+	appMenu.AddRole(application.Hide)
+	appMenu.AddRole(application.HideOthers)
+	appMenu.AddRole(application.UnHide)
+	appMenu.AddSeparator()
+	appMenu.AddRole(application.Quit)
+
+	menu.AddRole(application.EditMenu)
+
+	conn := menu.AddSubmenu("Connection")
 	if runtime.GOOS == "darwin" {
 		combo, _ := hotkeyspec.Parse(app.fillHotkeyStorage())
-		conn.AddText("Fill VPN login", wailsAccelerator(combo), func(_ *menu.CallbackData) {
+		item := conn.Add("Fill VPN login")
+		if accel := menuAccelerator(combo); accel != "" {
+			item.SetAccelerator(accel)
+		}
+		item.OnClick(func(_ *application.Context) {
 			go func() { _ = app.FillNativeLoginHotkey("") }()
 		})
 	}
 
-	help := m.AddSubmenu("Help")
-	help.AddText("Check for Updates…", nil, func(_ *menu.CallbackData) {
-		go func() {
-			view, err := app.CheckForUpdate()
-			if err != nil {
-				return
-			}
-			if view.UpdateAvailable {
-				app.notifyUpdateAvailable(view)
-			}
-		}()
-	})
+	menu.AddRole(application.WindowMenu)
+	menu.AddRole(application.HelpMenu)
 
-	return m
+	return menu
 }
 
-func refreshApplicationMenu(ctx context.Context, app *App) {
-	wailsruntime.MenuSetApplicationMenu(ctx, applicationMenu(app))
-	wailsruntime.MenuUpdateApplicationMenu(ctx)
+func (a *App) refreshApplicationMenu() {
+	wails := application.Get()
+	if wails == nil {
+		return
+	}
+	wails.Menu.SetApplicationMenu(buildApplicationMenu(a))
+	if menu := wails.Menu.GetApplicationMenu(); menu != nil {
+		menu.Update()
+	}
 }
 
-func wailsAccelerator(c hotkeyspec.Combo) *keys.Accelerator {
-	wm := make([]keys.Modifier, 0, len(c.Modifiers))
+func menuAccelerator(c hotkeyspec.Combo) string {
+	if c.Key == "" {
+		return ""
+	}
+	parts := make([]string, 0, len(c.Modifiers)+1)
 	for _, m := range c.Modifiers {
 		switch m {
 		case "cmd":
-			wm = append(wm, keys.CmdOrCtrlKey)
+			parts = append(parts, "Cmd")
 		case "ctrl":
-			wm = append(wm, keys.ControlKey)
+			parts = append(parts, "Ctrl")
 		case "option":
-			wm = append(wm, keys.OptionOrAltKey)
+			parts = append(parts, "Alt")
 		case "shift":
-			wm = append(wm, keys.ShiftKey)
+			parts = append(parts, "Shift")
 		}
 	}
-	if len(wm) == 0 {
-		return keys.CmdOrCtrl(c.Key)
+	parts = append(parts, c.Key)
+	return stringsJoinAccelerator(parts)
+}
+
+func stringsJoinAccelerator(parts []string) string {
+	if len(parts) == 0 {
+		return ""
 	}
-	if len(wm) == 1 {
-		return &keys.Accelerator{Key: c.Key, Modifiers: wm}
+	out := parts[0]
+	for _, p := range parts[1:] {
+		out += "+" + p
 	}
-	return keys.Combo(c.Key, wm[0], wm[1], wm[2:]...)
+	return out
 }

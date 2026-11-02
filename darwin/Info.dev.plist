@@ -1,0 +1,43 @@
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>CFBundlePackageType</key>
+            <string>APPL</string>
+        <key>CFBundleName</key>
+            <string>Tobiro</string>
+        <key>CFBundleExecutable</key>
+            <string>Tobiro</string>
+        <key>CFBundleIdentifier</key>
+            <string>net.tobiro.access</string>
+        <key>CFBundleVersion</key>
+            <string>0.0.1</string>
+        <key>CFBundleGetInfoString</key>
+            <string>Part of the biebie.net product family.</string>
+        <key>CFBundleShortVersionString</key>
+            <string>0.0.1</string>
+        <key>CFBundleIconFile</key>
+            <string>icons</string>
+        <key>LSMinimumSystemVersion</key>
+            <string>12.0.0</string>
+        <key>NSHighResolutionCapable</key>
+            <string>true</string>
+        <key>NSHumanReadableCopyright</key>
+            <string>© 2026, Tobiro</string>
+        <key>NSAppTransportSecurity</key>
+        <dict>
+            <key>NSAllowsLocalNetworking</key>
+            <true/>
+        </dict>
+        <key>CFBundleURLTypes</key>
+        <array>
+            <dict>
+                <key>CFBundleURLName</key>
+                <string>wails.com.tobiro</string>
+                <key>CFBundleURLSchemes</key>
+                <array>
+                    <string>tobiro</string>
+                </array>
+            </dict>
+        </array>
+    </dict>
+</plist>

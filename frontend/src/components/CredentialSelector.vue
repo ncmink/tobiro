@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { domain } from '@bindings/go/models'
+import type { domain } from '@/lib/bindings'
 
 defineProps<{ credentials: domain.CredentialView[]; modelValue: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()

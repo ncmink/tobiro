@@ -1,5 +1,5 @@
 import { computed, readonly, ref, watch } from 'vue'
-import { WindowSetBackgroundColour } from '@bindings/runtime/runtime'
+import { WindowSetBackgroundColour } from '@/api'
 
 export type ThemePreference = 'system' | 'dark' | 'light'
 const storageKey = 'tobiro.theme'

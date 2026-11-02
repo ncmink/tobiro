@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.0.1"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.0.1",
+			"CompanyName": "Tobiro",
+			"FileDescription": "Desktop access manager for DevOps engineers.",
+			"LegalCopyright": "© 2026, Tobiro",
+			"ProductName": "Tobiro",
+			"Comments": "Part of the biebie.net product family."
+		}
+	}
+}

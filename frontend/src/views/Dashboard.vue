@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
-import type { domain, main } from '@bindings/go/models'
+import type { domain, main } from '@/lib/bindings'
 import logo from '@/assets/images/app-logo.png'
 import ConnectDialog from '@/components/ConnectDialog.vue'
 import ConnectionCard from '@/components/ConnectionCard.vue'

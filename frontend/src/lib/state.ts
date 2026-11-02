@@ -1,4 +1,4 @@
-import type { domain, main } from '@bindings/go/models'
+import type { domain, main } from '@/lib/bindings'
 
 /** Presentation metadata for the Go connection state machine. */
 export type ConnectionState =

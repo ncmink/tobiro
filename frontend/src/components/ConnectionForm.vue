@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 
-import { ListVendorProfiles } from '@bindings/go/main/App'
-import type { domain, main } from '@bindings/go/models'
+import { ListVendorProfiles } from '@/api'
+import type { domain, main } from '@/lib/bindings'
 import AppModal from '@/components/AppModal.vue'
 import AppSelect from '@/components/AppSelect.vue'
 import { errorMessage } from '@/lib/state'

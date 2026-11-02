@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 
-import { ReadSSHCommand } from '@bindings/go/main/App'
-import type { domain, main } from '@bindings/go/models'
+import { ReadSSHCommand } from '@/api'
+import type { domain, main } from '@/lib/bindings'
 import { errorMessage } from '@/lib/state'
 
 const props = defineProps<{ connection: main.ConnectionView }>()
