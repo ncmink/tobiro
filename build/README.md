@@ -32,6 +32,7 @@ build with `wails build`.
 - `icon.ico` - The icon used for the application. This is used when building using `wails build`. If you wish to
   use a different icon, simply replace this file with your own. If it is missing, a new `icon.ico` file
   will be created using the `appicon.png` file in the build directory.
+- `nsis/` - NSIS installer scripts for `wails3 task windows:package` (`project.nsi`, `wails_tools.nsh`). Legacy Wails v2 files under `installer/` are unused.
 - `installer/*` - The files used to create the Windows installer. These are used when building using `wails build`.
 - `info.json` - Application details used for Windows builds. The data here will be used by the Windows installer,
   as well as the application itself (right click the exe -> properties -> details)
