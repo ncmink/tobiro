@@ -198,14 +198,20 @@ tasks:
       - "appicon.png"
     generates:
       - "darwin/icons.icns"
-      - "darwin/dmg-file-icon.png"
-      - "darwin/dmg-file-icon.icns"
       - "windows/icon.ico"
     cmds:
       - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico
-      - /bin/cp -f appicon.png darwin/dmg-file-icon.png
-      - /bin/cp -f darwin/icons.icns darwin/dmg-file-icon.icns
+      - task: sync:dmg:icons
       - task: sync:dev:app:icons
+
+  sync:dmg:icons:
+    summary: Refreshes DMG file icon assets from appicon (macOS packaging only)
+    internal: true
+    platforms: [darwin]
+    dir: build
+    cmds:
+      - cp -f appicon.png darwin/dmg-file-icon.png
+      - cp -f darwin/icons.icns darwin/dmg-file-icon.icns
 
   sync:dev:app:icons:
     summary: Refreshes Dock icons in bin/*.dev.app after generate:icons (macOS dev)
