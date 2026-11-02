@@ -23,6 +23,18 @@ Add these **GitHub repository secrets** on [ncmink/tobiro](https://github.com/nc
 | `UPDATER_SIGNING_KEY` | Full PEM text of `updater.key` (pair of committed `updater.key.pub`) |
 | `PROTOCOL_TOKEN` | PAT to clone private `ncmink/biebie-protocol` |
 
+**Protocol dependency:** Tobiro’s peer RPC sets `AccessProfile.Kind` (`vpn` / `ssh`).
+That field must exist on **`ncmink/biebie-protocol` `master`** before release CI can
+compile. If CI fails with `unknown field Kind`, push the protocol repo first (see
+below), then re-run the release workflow.
+
+```bash
+cd ../biebie-protocol   # sibling of tobiro in the monorepo checkout
+git add context/access.go
+git commit -m "Add AccessProfile.Kind for VPN vs SSH in peer profile lists"
+git push origin master
+```
+
 See `HOWTOUPDATERKEY.md` for generating `updater.key`.
 
 ## Short version (v0.0.1)

@@ -19,6 +19,9 @@ The directory contains the following files:
 
 - `Info.plist` - the main plist file used for Mac builds. It is used when building using `wails build`.
 - `Info.dev.plist` - same as the main plist file but used when building using `wails dev`.
+- `icons.icns` - Dock / `.app` icon (from `appicon.png` via `wails3 task common:generate:icons`).
+- `dmg-file-icon.png` / `dmg-file-icon.icns` - icon for the `.app` inside the release `.dmg` (same logo as `appicon.png`).
+- `dmg-background.png` - 540×380 window art for the `.dmg`. Regenerate with Pillow: `python3 build/scripts/render-dmg-background.py` (requires `pip install pillow`).
 
 ## Windows
 

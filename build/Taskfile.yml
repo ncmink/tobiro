@@ -198,9 +198,13 @@ tasks:
       - "appicon.png"
     generates:
       - "darwin/icons.icns"
+      - "darwin/dmg-file-icon.png"
+      - "darwin/dmg-file-icon.icns"
       - "windows/icon.ico"
     cmds:
       - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico
+      - /bin/cp -f appicon.png darwin/dmg-file-icon.png
+      - /bin/cp -f darwin/icons.icns darwin/dmg-file-icon.icns
       - task: sync:dev:app:icons
 
   sync:dev:app:icons:
