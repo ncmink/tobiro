@@ -3,6 +3,7 @@ bin
 node_modules
 frontend/dist
 frontend/wailsjs
+.task
 
 # Updater signing keys. Public half (updater.key.pub) is committed; private never is.
 /updater.key

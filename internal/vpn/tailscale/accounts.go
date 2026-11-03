@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"tobiro/internal/domain"
-	"tobiro/internal/sysexec"
 )
 
 // ActiveSwitch holds every tailscale switch profile on this machine.
@@ -212,7 +211,7 @@ func accountsToOptions(accounts []switchAccount) []domain.VendorProfileOption {
 
 // ListAccounts reports tailscale switch --list on this machine.
 func ListAccounts(ctx context.Context, cli string) ([]domain.VendorProfileOption, error) {
-	res, err := sysexec.Run(ctx, cli, "switch", "--list", "--json")
+	res, err := runCLI(ctx, cli, "switch", "--list", "--json")
 	if err != nil {
 		combined := strings.TrimSpace(res.Combined())
 		if combined == "" {

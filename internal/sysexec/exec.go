@@ -44,6 +44,16 @@ func Run(ctx context.Context, executable string, args ...string) (Result, error)
 // password to a client that reads one, since it never appears in the process
 // argument list (which is world-readable via ps).
 func RunWithInput(ctx context.Context, executable string, stdin string, args ...string) (Result, error) {
+	return run(ctx, executable, stdin, nil, args...)
+}
+
+// RunWithEnv is Run with extra KEY=VALUE entries appended to the inherited
+// environment.
+func RunWithEnv(ctx context.Context, env []string, executable string, args ...string) (Result, error) {
+	return run(ctx, executable, "", env, args...)
+}
+
+func run(ctx context.Context, executable string, stdin string, env []string, args ...string) (Result, error) {
 	if err := domain.ValidateExecutablePath(executable); err != nil {
 		return Result{}, err
 	}
@@ -57,6 +67,9 @@ func RunWithInput(ctx context.Context, executable string, stdin string, args ...
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, executable, args...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}

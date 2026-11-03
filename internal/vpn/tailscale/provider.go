@@ -111,8 +111,17 @@ func (p *Provider) findApp() string {
 	}
 }
 
+// cliEnv keeps the macOS app binary in CLI mode. Without a TTY (always the case
+// when Tobiro runs it) the binary otherwise launches the Tailscale GUI, hangs,
+// and crashes — once per status poll.
+var cliEnv = []string{"TAILSCALE_BE_CLI=1"}
+
+func runCLI(ctx context.Context, cli string, args ...string) (sysexec.Result, error) {
+	return sysexec.RunWithEnv(ctx, cliEnv, cli, args...)
+}
+
 func cliVersion(ctx context.Context, cli string) string {
-	res, err := sysexec.Run(ctx, cli, "version")
+	res, err := runCLI(ctx, cli, "version")
 	if err != nil {
 		return ""
 	}
@@ -153,10 +162,18 @@ func (p *Provider) Capabilities(ctx context.Context) (*domain.Capabilities, erro
 	return caps, nil
 }
 
-func (p *Provider) requireCLI(ctx context.Context) (string, *domain.ClientInfo, error) {
-	info, err := p.Detect(ctx)
-	if err != nil {
-		return "", nil, err
+// requireCLI locates the CLI without running `tailscale version`; it sits on
+// the status poll path.
+func (p *Provider) requireCLI(_ context.Context) (string, *domain.ClientInfo, error) {
+	info := &domain.ClientInfo{
+		Provider: domain.ProviderTailscale,
+		Platform: runtime.GOOS,
+		CLIPath:  p.findCLI(),
+		Path:     p.findApp(),
+	}
+	info.Installed = info.CLIPath != "" || info.Path != ""
+	if info.Path == "" {
+		info.Path = info.CLIPath
 	}
 	if !info.Installed {
 		return "", info, fmt.Errorf("%s: %w", domain.ProviderTailscale.DisplayName(), domain.ErrClientNotInstalled)
@@ -215,13 +232,13 @@ func (p *Provider) Connect(ctx context.Context, profile domain.VPNProfile, _ dom
 			return err
 		}
 		if !resolved.Account.Selected {
-			if err := p.runSwitch(ctx, cli, resolved.Account.ID); err != nil {
+			if err := p.runSwitch(ctx, cli, resolved.Account.ID); err != nil && !p.switchedTo(ctx, cli, target) {
 				return err
 			}
 		}
 	}
 
-	res, err := sysexec.Run(ctx, cli, "up")
+	res, err := runCLI(ctx, cli, "up")
 	if err != nil {
 		return fmt.Errorf("tailscale up: %s", defaultString(strings.TrimSpace(res.Combined()), err.Error()))
 	}
@@ -266,7 +283,7 @@ func (p *Provider) Disconnect(ctx context.Context, profile domain.VPNProfile) er
 		}
 	}
 
-	res, err := sysexec.Run(ctx, cli, "down")
+	res, err := runCLI(ctx, cli, "down")
 	if err != nil {
 		return fmt.Errorf("tailscale down: %s", defaultString(strings.TrimSpace(res.Combined()), err.Error()))
 	}
@@ -307,7 +324,7 @@ func StatusFromReading(machine MachineReading, vendorProfile string, sw ActiveSw
 }
 
 func (p *Provider) readStatus(ctx context.Context, cli string) statusReading {
-	res, err := sysexec.Run(ctx, cli, "status", "--json")
+	res, err := runCLI(ctx, cli, "status", "--json")
 	if err != nil {
 		combined := res.Combined()
 		if looksLikeDaemonDown(combined) {
@@ -319,7 +336,7 @@ func (p *Provider) readStatus(ctx context.Context, cli string) statusReading {
 }
 
 func (p *Provider) listSwitchAccounts(ctx context.Context, cli string) ([]switchAccount, error) {
-	res, err := sysexec.Run(ctx, cli, "switch", "--list", "--json")
+	res, err := runCLI(ctx, cli, "switch", "--list", "--json")
 	if err != nil {
 		combined := strings.TrimSpace(res.Combined())
 		if combined == "" {
@@ -339,7 +356,7 @@ func (p *Provider) readSwitchList(ctx context.Context, cli string) (ActiveSwitch
 }
 
 func (p *Provider) runSwitch(ctx context.Context, cli, target string) error {
-	res, err := sysexec.Run(ctx, cli, "switch", target)
+	res, err := runCLI(ctx, cli, "switch", target)
 	if err != nil {
 		combined := strings.TrimSpace(res.Combined())
 		msg := defaultString(combined, err.Error())
@@ -355,6 +372,18 @@ func (p *Provider) runSwitch(ctx context.Context, cli, target string) error {
 		return fmt.Errorf("tailscale switch: %s", msg)
 	}
 	return nil
+}
+
+// switchedTo reports whether target is now the selected profile. `tailscale
+// switch` exits non-zero ("Tailscale is stopped.") after a successful switch
+// to a profile that is not running, which Connect fixes with `tailscale up`.
+func (p *Provider) switchedTo(ctx context.Context, cli, target string) bool {
+	accounts, err := p.listSwitchAccounts(ctx, cli)
+	if err != nil {
+		return false
+	}
+	resolved := resolveProfile(accounts, target)
+	return resolved.Result == resolveFound && resolved.Account.Selected
 }
 
 func looksLikeUnknownAccount(msg string) bool {

@@ -21,7 +21,7 @@ The directory contains the following files:
 - `Info.dev.plist` - same as the main plist file but used when building using `wails dev`.
 - `icons.icns` - Dock / `.app` icon (from `appicon.png` via `wails3 task common:generate:icons`).
 - `dmg-file-icon.png` / `dmg-file-icon.icns` - icon for the `.app` inside the release `.dmg` (same logo as `appicon.png`).
-- `dmg-background.png` - 540×380 window art for the `.dmg`. Regenerate with Pillow: `python3 build/scripts/render-dmg-background.py` (requires `pip install pillow`).
+- `dmg-background.png` - 540×380 window art for the `.dmg` (soft lavender gradient with the Tobiro emblem in the bottom-right corner, matching the Biebie product family style).
 
 ## Windows
 
