@@ -33,12 +33,6 @@ func readStatus(ctx context.Context, profile domain.VPNProfile) *domain.VPNStatu
 	return &st
 }
 
-type snapshot struct {
-	gatewayStatus    domain.VPNStatus
-	activeConnection string
-	saved            []savedConnection
-}
-
 func readSnapshot(ctx context.Context, host string, port int) (snapshot, bool) {
 	if port == 0 {
 		port = 443

@@ -15,6 +15,13 @@ type savedConnection struct {
 	URI  string
 }
 
+// snapshot is one macOS Ivanti daemon read used to reconcile several cards.
+type snapshot struct {
+	gatewayStatus    domain.VPNStatus
+	activeConnection string
+	saved            []savedConnection
+}
+
 var (
 	connstoreHeader = regexp.MustCompile(`^ive\s+"([^"]+)"\s*\{\s*$`)
 	connstoreField  = regexp.MustCompile(`^([a-z-]+):\s*"(.*)"\s*$`)
