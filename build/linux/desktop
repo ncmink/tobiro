@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Tobiro
+Comment=Desktop access manager for DevOps engineers.
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/Tobiro %u
+Terminal=false
+Type=Application
+Icon=Tobiro
+Categories=Utility;
+StartupWMClass=Tobiro
+
+MimeType=x-scheme-handler/tobiro; 

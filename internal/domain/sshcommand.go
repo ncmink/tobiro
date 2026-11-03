@@ -105,6 +105,9 @@ func ParseSSHCommand(raw string) (SSHCommand, error) {
 	if destination == "" {
 		return SSHCommand{}, errors.New("this command names no server to connect to")
 	}
+	if len(forwards) == 0 {
+		return SSHCommand{}, errors.New("an SSH tunnel needs at least one port to forward")
+	}
 
 	host := strings.TrimPrefix(destination, "ssh://")
 	if at := strings.LastIndex(host, "@"); at >= 0 {
