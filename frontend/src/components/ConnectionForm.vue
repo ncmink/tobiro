@@ -109,7 +109,7 @@ const checksForcepointStatus = computed(() => form.provider === 'forcepoint')
 const profileLabel = computed(() => vendorProfileField.value?.label ?? 'Vendor profile')
 
 /** Adapters that implement VendorProfileLister on this platform. */
-const vendorProfileListerProviders = new Set(['macosvpn', 'tailscale'])
+const vendorProfileListerProviders = new Set(['macosvpn', 'tailscale', 'ivanti'])
 
 /**
  * What the provider already has configured on this machine.
@@ -138,7 +138,9 @@ watch(
     discovering.value = true
     const timeoutHint = provider === 'tailscale'
       ? 'Could not load Tailscale accounts. Enter a nickname or tailnet from tailscale switch --list.'
-      : 'Could not load saved VPN connections. Enter the name shown in System Settings.'
+      : provider === 'ivanti'
+        ? 'Could not load Ivanti connections. Enter the connection name shown in Ivanti Secure Access.'
+        : 'Could not load saved VPN connections. Enter the name shown in System Settings.'
     try {
       const options = await Promise.race([
         ListVendorProfiles(provider),
@@ -153,7 +155,9 @@ watch(
           err,
           provider === 'tailscale'
             ? 'Could not load Tailscale accounts. You can enter a nickname or tailnet below.'
-            : 'Could not load saved VPN connections. You can enter the name below.',
+            : provider === 'ivanti'
+              ? 'Could not load Ivanti connections. You can enter the connection name below.'
+              : 'Could not load saved VPN connections. You can enter the name below.',
         )
       }
     } finally {

@@ -189,6 +189,13 @@ func (p *Provider) Status(ctx context.Context, profile domain.VPNProfile) (*doma
 	return readStatus(ctx, profile), nil
 }
 
+// ListVendorProfiles offers the connections saved in the Ivanti client. Each
+// one holds its own remembered account, so binding a card to one tells cards
+// that share a gateway apart.
+func (p *Provider) ListVendorProfiles(_ context.Context) ([]domain.VendorProfileOption, error) {
+	return listConnections()
+}
+
 // OpenNativeClient launches the Ivanti GUI.
 func (p *Provider) OpenNativeClient(ctx context.Context, profile domain.VPNProfile) error {
 	path := profile.ClientPath

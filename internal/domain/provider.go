@@ -214,6 +214,11 @@ func (p VPNProvider) VendorProfileField() VendorProfileField {
 			Label: "Saved FortiClient connection",
 			Hint:  "Connection name already configured in FortiClient",
 		}
+	case ProviderIvanti:
+		return VendorProfileField{
+			Label: "Saved Ivanti connection",
+			Hint:  "Connection in Ivanti Secure Access that holds this account. Needed when several cards share a gateway.",
+		}
 	case ProviderTailscale:
 		return VendorProfileField{
 			Label:    "Tailscale account",

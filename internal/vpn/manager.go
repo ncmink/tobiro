@@ -12,6 +12,7 @@ import (
 	"tobiro/internal/domain"
 	"tobiro/internal/logging"
 	"tobiro/internal/session"
+	"tobiro/internal/vpn/ivanti"
 	"tobiro/internal/vpn/tailscale"
 	"tobiro/internal/vpn/tunnel"
 )
@@ -322,10 +323,12 @@ func (m *Manager) Disconnect(ctx context.Context, profileID string) (domain.VPNS
 
 // RefreshStatus polls the vendor client and reconciles the session table.
 func (m *Manager) RefreshStatus(ctx context.Context, profile domain.VPNProfile) {
-	if profile.Provider == domain.ProviderTailscale {
+	switch profile.Provider {
+	case domain.ProviderTailscale, domain.ProviderIvanti:
 		return
+	default:
+		m.syncProfileStatus(ctx, profile)
 	}
-	m.syncProfileStatus(ctx, profile)
 }
 
 func (m *Manager) syncProfileStatus(ctx context.Context, profile domain.VPNProfile) {
@@ -357,6 +360,13 @@ func (m *Manager) applyVPNStatus(profile domain.VPNProfile, status domain.VPNSta
 	}
 }
 
+func (m *Manager) refreshIvantiStatuses(ctx context.Context, profiles []domain.VPNProfile) {
+	if len(profiles) == 0 {
+		return
+	}
+	ivanti.ReconcileProfiles(ctx, profiles, m.sessions, m.applyVPNStatus)
+}
+
 func (m *Manager) refreshTailscaleStatuses(ctx context.Context, profiles []domain.VPNProfile) {
 	if len(profiles) == 0 {
 		return
@@ -379,14 +389,18 @@ func (m *Manager) refreshTailscaleStatuses(ctx context.Context, profiles []domai
 // status does not depend on the webview's timer staying awake.
 func (m *Manager) RefreshAll(ctx context.Context) {
 	all := m.profiles.List()
-	var tailscaleProfiles []domain.VPNProfile
+	var tailscaleProfiles, ivantiProfiles []domain.VPNProfile
 	for _, profile := range all {
-		if profile.Provider == domain.ProviderTailscale {
+		switch profile.Provider {
+		case domain.ProviderTailscale:
 			tailscaleProfiles = append(tailscaleProfiles, profile)
-			continue
+		case domain.ProviderIvanti:
+			ivantiProfiles = append(ivantiProfiles, profile)
+		default:
+			m.syncProfileStatus(ctx, profile)
 		}
-		m.syncProfileStatus(ctx, profile)
 	}
+	m.refreshIvantiStatuses(ctx, ivantiProfiles)
 	m.refreshTailscaleStatuses(ctx, tailscaleProfiles)
 }
 

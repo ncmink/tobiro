@@ -4,9 +4,14 @@ package ivanti
 
 import (
 	"context"
+	"errors"
 
 	"tobiro/internal/domain"
 )
+
+func listConnections() ([]domain.VendorProfileOption, error) {
+	return nil, errors.New("saved Ivanti connections are only read on macOS")
+}
 
 // statusSupported reports that no status source has been verified for this
 // platform yet.
@@ -22,4 +27,8 @@ func readStatus(_ context.Context, _ domain.VPNProfile) *domain.VPNStatus {
 		Known:  false,
 		Detail: "Tunnel status is not read from the Ivanti client on this platform; check the Ivanti Secure Access window.",
 	}
+}
+
+func readSnapshot(context.Context, string, int) (snapshot, bool) {
+	return snapshot{}, false
 }

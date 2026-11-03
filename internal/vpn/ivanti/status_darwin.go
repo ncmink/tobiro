@@ -2,7 +2,9 @@ package ivanti
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -23,6 +25,83 @@ func statusSupported() bool { return true }
 // returned with Known=false so the session manager keeps whatever it already
 // knows rather than acting on a guess.
 func readStatus(ctx context.Context, profile domain.VPNProfile) *domain.VPNStatus {
+	snap, ok := readSnapshot(ctx, profile.Host, profile.Port)
+	if !ok {
+		return readGatewayStatus(ctx, profile)
+	}
+	st := statusForProfile(profile, snap, 1)
+	return &st
+}
+
+type snapshot struct {
+	gatewayStatus    domain.VPNStatus
+	activeConnection string
+	saved            []savedConnection
+}
+
+func readSnapshot(ctx context.Context, host string, port int) (snapshot, bool) {
+	if port == 0 {
+		port = 443
+	}
+	probe := domain.VPNProfile{Host: host, Port: port}
+	gateway := readGatewayStatus(ctx, probe)
+	if gateway == nil {
+		gateway = &domain.VPNStatus{Known: false}
+	}
+
+	raw, err := os.ReadFile(connstorePath)
+	var saved []savedConnection
+	if err == nil {
+		saved = parseConnstore(string(raw))
+	}
+	return snapshot{
+		gatewayStatus:    *gateway,
+		activeConnection: readActiveConnection(),
+		saved:            saved,
+	}, true
+}
+
+const (
+	connstorePath = "/Library/Application Support/Pulse Secure/Pulse/connstore.dat"
+	eventsLogPath = "/private/var/log/Pulse Secure/Logging/ISACEvents.log"
+
+	// eventsTailBytes bounds how much of the event log a status poll reads.
+	eventsTailBytes = 256 << 10
+)
+
+// readActiveConnection returns the Ivanti connection name the client last
+// brought up, or "" when the event log cannot be read.
+func readActiveConnection() string {
+	f, err := os.Open(eventsLogPath)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return ""
+	}
+	offset := info.Size() - eventsTailBytes
+	if offset < 0 {
+		offset = 0
+	}
+	buf := make([]byte, info.Size()-offset)
+	if _, err := f.ReadAt(buf, offset); err != nil && !errors.Is(err, io.EOF) {
+		return ""
+	}
+	return activeConnectionName(string(buf))
+}
+
+// listConnections reads the connections saved in the Ivanti client.
+func listConnections() ([]domain.VendorProfileOption, error) {
+	raw, err := os.ReadFile(connstorePath)
+	if err != nil {
+		return nil, fmt.Errorf("read Ivanti connections: %w", err)
+	}
+	return connectionOptions(parseConnstore(string(raw)), readActiveConnection()), nil
+}
+
+func readGatewayStatus(ctx context.Context, profile domain.VPNProfile) *domain.VPNStatus {
 	reading, err := readTunnel()
 	if err != nil {
 		// The route-recovery file is the precise source, but it only exists

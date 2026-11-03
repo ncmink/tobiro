@@ -97,7 +97,7 @@ func SupportedAuthMethods() []AuthMethodInfo {
 //   - ID is an internal UUID and is the ONLY identity key.
 //   - Username is descriptive data. It is NOT unique — "devops" may legitimately
 //     exist on many profiles, and even more than once within a single profile.
-//   - Label is what a human picks from the UI ("Ming", "DevOps Shared").
+//   - Label is what a human picks from the UI ("Work", "DevOps shared").
 //   - The password itself never lives here; SecretRef points at an OS keychain
 //     entry and Secret is transient (see below).
 type Credential struct {

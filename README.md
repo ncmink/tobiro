@@ -53,7 +53,7 @@ All three are valid and distinct — and two credentials on the *same* profile m
 also share a username. Nothing keys off `username`: not storage, not the secret
 reference, not the "last used account" preference, not the session record.
 
-`Label` is the human-readable identity shown in the UI ("Ming", "DevOps
+`Label` is the human-readable identity shown in the UI ("Work", "DevOps
 Shared", "Backup Account").
 
 `internal/vpn/manager_test.go` enforces this with
@@ -144,14 +144,15 @@ Application data holds only a reference derived from UUIDs:
 ```yaml
 credential:
   id: 5f3a1c9e-…
-  username: ming
+  label: Work
+  username: devops
   secretRef: tobiro/<profileId>/<credentialId>
 ```
 
 The frontend receives a `CredentialView`, which has no password field at all:
 
 ```json
-{ "id": "5f3a1c9e-…", "label": "Ming", "username": "ming", "hasPassword": true }
+{ "id": "5f3a1c9e-…", "label": "Work", "username": "devops", "hasPassword": true }
 ```
 
 A password is materialised in exactly one place — `CredentialService.Resolve`,

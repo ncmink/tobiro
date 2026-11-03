@@ -75,7 +75,7 @@ func (s ConnectionState) IsActive() bool {
 // VPNSession is a single connection attempt/lifetime for one profile.
 //
 // It records which credential UUID is in use, so the app can say "SMOI is
-// connected using Ming" without ever treating the username as the identity.
+// connected using Work" without ever treating the username as the identity.
 type VPNSession struct {
 	ID           string `json:"id"`
 	ProfileID    string `json:"profileId"`

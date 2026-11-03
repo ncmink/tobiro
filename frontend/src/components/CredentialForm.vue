@@ -99,12 +99,12 @@ defineExpose({
           id="cred-label"
           v-model="form.label"
           type="text"
-          placeholder="Ming"
+          placeholder="Work"
           autocomplete="off"
           class="w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand"
         />
         <p class="mt-1 text-xs text-ink-faint">
-          How you will recognise this identity, e.g. "Ming" or "DevOps Shared".
+          How you will recognise this identity, e.g. "Work" or "DevOps shared".
         </p>
       </div>
 

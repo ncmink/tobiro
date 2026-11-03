@@ -73,8 +73,8 @@ func main() {
 	// connection they did not click on: the router brings it up with whatever
 	// was last used, or its default.
 	if _, err := credentials.Create(created.ID, domain.CredentialInput{
-		Label:      "Ming",
-		Username:   "ming",
+		Label:      "Work",
+		Username:   "devops",
 		AuthMethod: domain.AuthPassword,
 		Password:   "not-a-real-password",
 		IsDefault:  true,
