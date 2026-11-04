@@ -67,6 +67,7 @@ func run(ctx context.Context, executable string, stdin string, env []string, arg
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, executable, args...)
+	hideConsole(cmd)
 	if len(env) > 0 {
 		cmd.Env = append(os.Environ(), env...)
 	}
