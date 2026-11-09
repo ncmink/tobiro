@@ -148,8 +148,16 @@ jobs:
             exit 1
           fi
 
-          xcrun stapler staple "$DMG"
-          xcrun stapler validate "$DMG"
+          # The ticket is fetched from Apple's CloudKit, which drops connections
+          # now and then (Error 68 / NSURLErrorDomain -1005) right after acceptance.
+          for attempt in 1 2 3 4 5; do
+            if xcrun stapler staple "$DMG" && xcrun stapler validate "$DMG"; then
+              exit 0
+            fi
+            echo "stapling attempt $attempt failed; retrying in $((attempt * 20))s" >&2
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       - name: Sign updater asset
         env:
