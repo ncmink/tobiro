@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -158,7 +159,13 @@ func OpenApplication(ctx context.Context, path string) error {
 		if err := domain.ValidateExecutablePath(path); err != nil {
 			return err
 		}
-		cmd = exec.CommandContext(ctx, path)
+		// Not bound to ctx: the GUI must survive Tobiro's request or app context.
+		// Electron clients such as FortiClient resolve their config relative to
+		// the install folder and crash at startup ("reading 'TraceLog'") when
+		// started from another working directory or with Node/Electron overrides.
+		cmd = exec.Command(path)
+		cmd.Dir = filepath.Dir(path)
+		cmd.Env = guiEnv()
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -167,4 +174,19 @@ func OpenApplication(ctx context.Context, path string) error {
 	// Detach: the GUI outlives this call.
 	go func() { _ = cmd.Wait() }()
 	return nil
+}
+
+// guiEnv is the inherited environment minus variables that change how an
+// Electron or Node based vendor GUI boots.
+func guiEnv() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		switch strings.ToUpper(name) {
+		case "ELECTRON_RUN_AS_NODE", "ELECTRON_NO_ATTACH_CONSOLE", "NODE_OPTIONS", "NODE_PATH":
+			continue
+		}
+		env = append(env, kv)
+	}
+	return env
 }
