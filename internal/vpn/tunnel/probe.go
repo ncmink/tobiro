@@ -24,6 +24,11 @@ type Options struct {
 	// one of these processes is enough to call the tunnel up — the assigned
 	// address often appears a few seconds later.
 	ProcessHints []string
+
+	// AdapterHints are case-insensitive substrings of the vendor's virtual
+	// adapter description. Only Windows publishes descriptions; an adapter
+	// that is up and matches is enough to call the tunnel up.
+	AdapterHints []string
 }
 
 // Probe reports whether a tunnel to host:port is currently up.

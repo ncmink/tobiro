@@ -1,4 +1,4 @@
-//go:build !darwin
+//go:build !darwin && !windows
 
 package ivanti
 
@@ -19,9 +19,8 @@ func statusSupported() bool { return false }
 
 // readStatus returns an unknown reading.
 //
-// Linux and Windows publish tunnel state differently (pulsesvc and
-// pulselauncher respectively), and neither has been verified against a real
-// installation, so nothing is claimed here.
+// The Linux client publishes tunnel state through pulsesvc, which has not been
+// verified against a real installation, so nothing is claimed here.
 func readStatus(_ context.Context, _ domain.VPNProfile) *domain.VPNStatus {
 	return &domain.VPNStatus{
 		Known:  false,

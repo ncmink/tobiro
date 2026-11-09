@@ -199,7 +199,8 @@ func (p *Provider) Status(ctx context.Context, profile domain.VPNProfile) (*doma
 	reading := tunnel.ProbeWith(ctx, tunnel.Options{
 		Host:         profile.Host,
 		Port:         profile.Port,
-		ProcessHints: []string{"FortiClient", "fortivpn", "fct_"},
+		ProcessHints: []string{"FortiClient", "fortivpn", "fct_", "FortiSSLVPN", "FortiTray"},
+		AdapterHints: []string{"Fortinet"},
 	})
 	return tunnel.Status(reading), nil
 }
