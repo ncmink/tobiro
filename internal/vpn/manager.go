@@ -499,8 +499,9 @@ func (m *Manager) ProbeNativeLogin(ctx context.Context, profileID string) error 
 	return prober.ProbeNativeLogin(ctx, profile, domain.Credential{})
 }
 
-// FillNativeLogin keystrokes username and password into the vendor field that
-// already has keyboard focus when the user presses ⌘I. See nativefill on macOS.
+// FillNativeLogin types username and password into the vendor login window when
+// the user presses the fill shortcut. macOS uses Accessibility; Windows uses
+// Win32 (per-provider build tags).
 func (m *Manager) FillNativeLogin(ctx context.Context, profileID, credentialID string) error {
 	profile, err := m.profiles.Get(profileID)
 	if err != nil {
@@ -511,7 +512,7 @@ func (m *Manager) FillNativeLogin(ctx context.Context, profileID, credentialID s
 		return err
 	}
 	filler, ok := adapter.(LoginFiller)
-	if !ok || runtime.GOOS != "darwin" {
+	if !ok {
 		return fmt.Errorf("%s cannot fill login fields from Tobiro on this platform", profile.Provider.DisplayName())
 	}
 

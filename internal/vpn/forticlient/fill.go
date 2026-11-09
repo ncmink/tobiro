@@ -10,9 +10,16 @@ import (
 
 // errFillWaiting means FortiClient is running but its login fields were not in
 // the accessibility tree.
-var errFillWaiting = errors.New("could not find FortiClient's username and password fields — open the login window, then press ⌘I")
+var errFillWaiting = errors.New("could not find FortiClient's username and password fields — open the login window, then press the fill shortcut")
 
 var forticlientProcesses = []string{"FortiClientAgent", "FortiClient"}
+
+// forticlientProcessHints match Windows image names (FindVendorWindows).
+var forticlientProcessHints = []string{
+	"FortiClient",
+	"FortiTray",
+	"FortiSSLVPN",
+}
 
 // Provider implements vpn.LoginFiller. The method bodies are platform-specific.
 var _ vpn.LoginFiller = (*Provider)(nil)

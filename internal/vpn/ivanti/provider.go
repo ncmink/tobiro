@@ -152,6 +152,12 @@ func (p *Provider) Capabilities(ctx context.Context) (*domain.Capabilities, erro
 	case runtime.GOOS == "darwin":
 		caps.CanOpenNativeClient = true
 		caps.Notes = "Ivanti documents no supported macOS command line, so connecting happens in the Ivanti client. Tobiro watches the tunnel and shows its status here."
+	case runtime.GOOS == "windows":
+		caps.CanOpenNativeClient = info.Path != ""
+		if caps.CanOpenNativeClient {
+			caps.CanFillNativeLogin = true
+		}
+		caps.Notes = "Open the Ivanti login window, then press your fill shortcut (default Ctrl+Shift+I). Tobiro fills username and password; you click Connect in Ivanti."
 	default:
 		caps.CanOpenNativeClient = info.Path != ""
 		caps.Notes = "A command-line launcher was detected but is not driven yet. Tobiro opens the Ivanti client instead."
