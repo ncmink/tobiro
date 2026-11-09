@@ -25,7 +25,7 @@ import (
 )
 
 // appVersion is stamped into the Settings screen and release checks.
-const appVersion = "0.0.4"
+const appVersion = "0.0.5"
 
 // App is the Wails binding surface: use-case entry points only.
 //
