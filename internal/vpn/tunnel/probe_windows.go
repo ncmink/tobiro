@@ -22,12 +22,10 @@ func Supported() bool { return true }
 var (
 	iphlpapi                = windows.NewLazySystemDLL("iphlpapi.dll")
 	procGetExtendedTcpTable = iphlpapi.NewProc("GetExtendedTcpTable")
-	procGetExtendedUdpTable = iphlpapi.NewProc("GetExtendedUdpTable")
 )
 
 const (
 	tcpTableOwnerPIDAll = 5 // TCP_TABLE_OWNER_PID_ALL
-	udpTableOwnerPID    = 1 // UDP_TABLE_OWNER_PID
 	mibTCPStateEstab    = 5 // MIB_TCP_STATE_ESTAB
 )
 
@@ -38,12 +36,6 @@ type mibTCPRowOwnerPID struct {
 	RemoteAddr uint32
 	RemotePort uint32
 	OwningPID  uint32
-}
-
-type mibUDPRowOwnerPID struct {
-	LocalAddr uint32
-	LocalPort uint32
-	OwningPID uint32
 }
 
 // vpnAdapterHints match the descriptions of VPN virtual adapters whose address
@@ -61,11 +53,12 @@ var vpnAdapterHints = []string{
 }
 
 func collect(_ context.Context) *snapshot {
-	names := processNames()
+	// UDP is left out: Windows only lists local endpoints for UDP, and the VPN
+	// services keep their IKE sockets bound while disconnected, so a UDP row
+	// would read as a live session.
 	return &snapshot{
 		captured: time.Now(),
-		tcp:      tcpTable(names),
-		udp:      udpTable(names),
+		tcp:      tcpTable(processNames()),
 		tunnels:  listTunnelAddresses(),
 	}
 }
@@ -99,27 +92,7 @@ func tcpTable(names map[uint32]string) string {
 	return b.String()
 }
 
-func udpTable(names map[uint32]string) string {
-	buf := extendedTable(procGetExtendedUdpTable, udpTableOwnerPID)
-	if len(buf) < 4 {
-		return ""
-	}
-	count := binary.LittleEndian.Uint32(buf)
-	rowSize := unsafe.Sizeof(mibUDPRowOwnerPID{})
-	var b strings.Builder
-	for i := uint32(0); i < count; i++ {
-		off := 4 + uintptr(i)*rowSize
-		if off+rowSize > uintptr(len(buf)) {
-			break
-		}
-		row := (*mibUDPRowOwnerPID)(unsafe.Pointer(&buf[off]))
-		fmt.Fprintf(&b, "udp4 %s:%d *:* %d %s\n",
-			ipv4(row.LocalAddr), port(row.LocalPort), row.OwningPID, names[row.OwningPID])
-	}
-	return b.String()
-}
-
-// extendedTable calls GetExtendedTcpTable / GetExtendedUdpTable for AF_INET,
+// extendedTable calls GetExtendedTcpTable for AF_INET,
 // growing the buffer until the table fits.
 func extendedTable(proc *windows.LazyProc, class uintptr) []byte {
 	if proc.Find() != nil {

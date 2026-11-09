@@ -111,6 +111,50 @@ func FirstExisting(paths ...string) string {
 	return ""
 }
 
+// FindInProgramFiles looks for exeName (case-insensitive) up to three folders
+// below each vendor folder in Program Files, Program Files (x86) and their
+// Common Files. Vendors move their install folder between releases, so fixed
+// paths alone miss newer clients. Returns "" when nothing is found.
+func FindInProgramFiles(vendorDirs []string, exeName string) string {
+	var roots []string
+	for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"} {
+		if base := os.Getenv(env); base != "" {
+			roots = append(roots, base, filepath.Join(base, "Common Files"))
+		}
+	}
+	for _, root := range roots {
+		for _, vendor := range vendorDirs {
+			if found := findFile(filepath.Join(root, vendor), exeName, 3); found != "" {
+				return found
+			}
+		}
+	}
+	return ""
+}
+
+func findFile(dir, name string, depth int) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if !e.IsDir() && strings.EqualFold(e.Name(), name) {
+			return filepath.Join(dir, e.Name())
+		}
+	}
+	if depth == 0 {
+		return ""
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			if found := findFile(filepath.Join(dir, e.Name()), name, depth-1); found != "" {
+				return found
+			}
+		}
+	}
+	return ""
+}
+
 // LookPath resolves an executable on PATH, returning "" when absent.
 func LookPath(name string) string {
 	path, err := exec.LookPath(name)

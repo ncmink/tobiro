@@ -32,7 +32,7 @@ func (a *App) fillHotkeyIntroSeen() bool {
 
 // GetFillShortcut reports the global fill shortcut and registration state.
 func (a *App) GetFillShortcut() FillShortcutView {
-	if runtime.GOOS != "darwin" {
+	if !fillShortcutSupported() {
 		return FillShortcutView{Supported: false}
 	}
 	comboStr := a.fillHotkeyStorage()
@@ -48,7 +48,7 @@ func (a *App) GetFillShortcut() FillShortcutView {
 	return FillShortcutView{
 		Supported:     true,
 		Combo:         comboStr,
-		Display:       hotkeyspec.FormatDisplay(combo, true),
+		Display:       hotkeyspec.FormatDisplay(combo, runtime.GOOS == "darwin"),
 		Registered:    registered,
 		RegisterError: regErr,
 		IntroSeen:     a.fillHotkeyIntroSeen(),
@@ -57,8 +57,8 @@ func (a *App) GetFillShortcut() FillShortcutView {
 
 // SetFillShortcut changes the global fill shortcut.
 func (a *App) SetFillShortcut(combo string) error {
-	if runtime.GOOS != "darwin" {
-		return fmt.Errorf("custom fill shortcuts are only supported on macOS")
+	if !fillShortcutSupported() {
+		return fmt.Errorf("custom fill shortcuts are only supported on macOS and Windows")
 	}
 	parsed, err := hotkeyspec.Parse(combo)
 	if err != nil {
@@ -84,7 +84,11 @@ func (a *App) SetFillShortcut(combo string) error {
 	return nil
 }
 
-// ResetFillShortcut restores Command+I.
+func fillShortcutSupported() bool {
+	return runtime.GOOS == "darwin" || runtime.GOOS == "windows"
+}
+
+// ResetFillShortcut restores the platform default (⌘I, or Ctrl+Shift+I on Windows).
 func (a *App) ResetFillShortcut() error {
 	return a.SetFillShortcut(defaultFillHotkey)
 }

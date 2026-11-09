@@ -7,9 +7,6 @@ import (
 	"strings"
 )
 
-// DefaultStorage is the persisted shortcut when FillHotkey is empty.
-const DefaultStorage = "cmd+i"
-
 // Combo is a global shortcut: one or more modifiers plus a single key.
 type Combo struct {
 	Modifiers []string
@@ -106,6 +103,12 @@ func (c Combo) Canonical() string {
 
 // ValidateReserved rejects shortcuts that would fight the OS or Tobiro.
 func (c Combo) ValidateReserved() error {
+	if len(c.Modifiers) == 1 && c.Modifiers[0] == "ctrl" {
+		switch c.Key {
+		case "c", "v", "x", "a", "z", "s":
+			return ErrReservedCombo
+		}
+	}
 	hasCmd := false
 	for _, m := range c.Modifiers {
 		if m == "cmd" {
@@ -146,9 +149,9 @@ func FormatDisplay(c Combo, darwinDisplay bool) string {
 		} else {
 			switch m {
 			case "cmd":
-				parts = append(parts, "Cmd")
+				parts = append(parts, "Win")
 			case "option":
-				parts = append(parts, "Option")
+				parts = append(parts, "Alt")
 			case "ctrl":
 				parts = append(parts, "Ctrl")
 			case "shift":

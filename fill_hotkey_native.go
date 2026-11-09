@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build darwin || windows
 
 package main
 
@@ -12,7 +12,7 @@ import (
 
 func (a *App) startFillHotkey() {
 	if err := a.restartFillHotkey(a.fillHotkeyStorage()); err != nil {
-		a.log.Warn("Global fill hotkey unavailable (grant Accessibility in System Settings): %v", err)
+		a.log.Warn("Global fill hotkey unavailable (on macOS, grant Accessibility in System Settings): %v", err)
 	}
 }
 

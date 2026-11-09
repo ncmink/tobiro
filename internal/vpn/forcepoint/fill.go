@@ -9,7 +9,7 @@ import (
 
 // errFillWaiting means the Forcepoint login fields were not found as children
 // of the window, a group, or a sheet.
-var errFillWaiting = errors.New("could not find Forcepoint's username and password fields — open the login window, then press ⌘I")
+var errFillWaiting = errors.New("could not find Forcepoint's username and password fields — open the login window, then press the fill shortcut")
 
 var forcepointExactProcesses = []string{
 	"Forcepoint NGFW VPN Client",

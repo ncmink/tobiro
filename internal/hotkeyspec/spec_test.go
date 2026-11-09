@@ -42,6 +42,22 @@ func TestShiftOnlyRejected(t *testing.T) {
 	}
 }
 
+func TestReservedCtrlClipboard(t *testing.T) {
+	if _, err := Parse("ctrl+c"); err == nil {
+		t.Fatal("ctrl+c should be reserved")
+	}
+	if _, err := Parse("ctrl+shift+i"); err != nil {
+		t.Fatalf("ctrl+shift+i should be allowed: %v", err)
+	}
+}
+
+func TestFormatDisplayWindows(t *testing.T) {
+	c, _ := Parse("ctrl+shift+i")
+	if got := FormatDisplay(c, false); got != "Ctrl+Shift+I" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestFormatDisplayDarwin(t *testing.T) {
 	c, _ := Parse("cmd+i")
 	if got := FormatDisplay(c, true); got != "⌘I" {

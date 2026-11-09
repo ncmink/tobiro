@@ -94,7 +94,13 @@ func (p *Provider) Detect(ctx context.Context) (*domain.ClientInfo, error) {
 
 	case "windows":
 		cli := sysexec.FirstExisting(windowsCLIPaths...)
+		if cli == "" {
+			cli = sysexec.FindInProgramFiles([]string{"Pulse Secure", "Ivanti"}, "pulselauncher.exe")
+		}
 		app := sysexec.FirstExisting(windowsAppPaths...)
+		if app == "" {
+			app = sysexec.FindInProgramFiles([]string{"Pulse Secure", "Ivanti"}, "Pulse.exe")
+		}
 		if cli != "" || app != "" {
 			info.Installed = true
 			info.CLIPath = cli

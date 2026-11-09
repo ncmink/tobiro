@@ -61,7 +61,11 @@ func (p *Provider) Detect(ctx context.Context) (*domain.ClientInfo, error) {
 			info.Detail = "Forcepoint NGFW VPN Client was not found in /Applications."
 		}
 	case "windows":
-		if path := sysexec.FirstExisting(windowsExePaths...); path != "" {
+		path := sysexec.FirstExisting(windowsExePaths...)
+		if path == "" {
+			path = sysexec.FindInProgramFiles([]string{"Forcepoint", "Stonesoft"}, "sgvpn.exe")
+		}
+		if path != "" {
 			info.Installed = true
 			info.Path = path
 			info.Detail = "Forcepoint publishes no supported command line for connecting; the GUI is used."
@@ -95,10 +99,14 @@ func (p *Provider) Capabilities(ctx context.Context) (*domain.Capabilities, erro
 	if info.Installed {
 		caps.CanOpenNativeClient = true
 		caps.CanControlStartup = runtime.GOOS == "darwin"
-		if runtime.GOOS == "darwin" {
+		switch runtime.GOOS {
+		case "darwin":
 			caps.CanFillNativeLogin = true
 			caps.Notes = "Open the Forcepoint login window, then press your fill shortcut (default ⌘I). Tobiro fills username and password; you click Authenticate. Needs Accessibility permission for Tobiro."
-		} else {
+		case "windows":
+			caps.CanFillNativeLogin = true
+			caps.Notes = "Open the Forcepoint login window, then press your fill shortcut (default Ctrl+Shift+I). Tobiro fills username and password; you click Authenticate."
+		default:
 			caps.Notes = "Forcepoint documents no CLI for connecting, so logging in happens in the Forcepoint client. Tobiro watches the tunnel and shows its status here."
 		}
 	} else {
@@ -158,6 +166,9 @@ func (p *Provider) Status(ctx context.Context, profile domain.VPNProfile) (*doma
 		Host:         profile.Host,
 		Port:         profile.Port,
 		ProcessHints: hints,
+		// Windows IPsec keeps no TCP control socket; the virtual adapter
+		// coming up is the client's signal that the tunnel is established.
+		AdapterHints: []string{"Forcepoint", "Stonesoft"},
 	})
 	if reading.Connected {
 		return tunnel.Status(reading), nil
