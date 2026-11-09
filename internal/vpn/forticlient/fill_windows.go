@@ -5,6 +5,7 @@ package forticlient
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"tobiro/internal/domain"
 	"tobiro/internal/vpn/nativefill"
@@ -29,7 +30,7 @@ func (p *Provider) FillNativeLogin(ctx context.Context, _ domain.VPNProfile, cre
 		return errors.New("click the username field in the FortiClient login window, then press the fill shortcut")
 	}
 	if errors.Is(err, nativefill.ErrVendorWindow) || errors.Is(err, nativefill.ErrVendorLoginIncomplete) {
-		return errFillWaiting
+		return fmt.Errorf("%w: %v", errFillWaiting, err)
 	}
 	return err
 }

@@ -16,11 +16,15 @@ var forcepointExactProcesses = []string{
 	"Forcepoint VPN Client",
 }
 
+// forcepointProcessHints match macOS process names and Windows image names.
+// On Windows the "User Authentication" dialog belongs to sggui.exe, not to
+// the sgvpn service or a process named after the product.
 var forcepointProcessHints = []string{
 	"Forcepoint",
 	"Stonesoft",
 	"Sgvpn",
 	"sgvpn",
+	"sggui",
 }
 
 func canFill(credential domain.Credential) bool {

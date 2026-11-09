@@ -5,6 +5,7 @@ package nativefill
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -19,7 +20,18 @@ var ErrVendorClickUsername = errors.New("click the username field in the vendor 
 
 // FillVendorLoginWindow sets username and password in a vendor login window, or
 // types them into the focused field when the client does not use standard edits.
+//
+// Failures that mean "nothing usable was found" are wrapped with a description
+// of the foreground window, so the log shows what the vendor UI really is.
 func FillVendorLoginWindow(ctx context.Context, processHints []string, username, password string) error {
+	err := fillVendorLoginWindow(ctx, processHints, username, password)
+	if errors.Is(err, ErrVendorWindow) || errors.Is(err, ErrVendorClickUsername) {
+		return fmt.Errorf("%w (front window: %s)", err, DescribeForeground())
+	}
+	return err
+}
+
+func fillVendorLoginWindow(ctx context.Context, processHints []string, username, password string) error {
 	windows := FindVendorWindows(processHints)
 	if len(windows) == 0 {
 		return ErrVendorWindow
@@ -29,6 +41,9 @@ func FillVendorLoginWindow(ctx context.Context, processHints []string, username,
 		plain, secret := LoginFields(w.HWND)
 		if len(plain) == 0 || len(secret) == 0 {
 			continue
+		}
+		if BlockedByElevation(w.HWND) {
+			return ErrVendorElevated
 		}
 		if username != "" {
 			if err := SetFieldText(plain[0], username); err != nil {
@@ -44,9 +59,20 @@ func FillVendorLoginWindow(ctx context.Context, processHints []string, username,
 		return nil
 	}
 
-	front := windows[0]
-	if !IsForeground(front.HWND) {
+	// No standard controls: type into the field the user clicked, but only in
+	// a window the vendor process itself owns and that is in front.
+	var front *VendorWindow
+	for i := range windows {
+		if !windows[i].TitleOnly && IsForeground(windows[i].HWND) {
+			front = &windows[i]
+			break
+		}
+	}
+	if front == nil {
 		return ErrVendorClickUsername
+	}
+	if BlockedByElevation(front.HWND) {
+		return ErrVendorElevated
 	}
 	WaitForModifierRelease(ctx)
 	if username != "" {
@@ -75,14 +101,16 @@ func ProbeVendorLoginWindow(processHints []string) error {
 		return ErrVendorWindow
 	}
 	anyEdit := false
+	anyOwned := false
 	for _, w := range windows {
 		plain, secret := LoginFields(w.HWND)
 		if len(plain) > 0 && len(secret) > 0 {
 			return nil
 		}
 		anyEdit = anyEdit || len(plain) > 0 || len(secret) > 0
+		anyOwned = anyOwned || !w.TitleOnly
 	}
-	if !anyEdit {
+	if !anyEdit && anyOwned {
 		return nil
 	}
 	return ErrVendorLoginIncomplete

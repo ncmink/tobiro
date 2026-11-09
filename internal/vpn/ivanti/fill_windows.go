@@ -30,7 +30,7 @@ func (p *Provider) FillNativeLogin(ctx context.Context, _ domain.VPNProfile, cre
 		return fmt.Errorf("%w — then press the fill shortcut", err)
 	}
 	if errors.Is(err, nativefill.ErrVendorWindow) || errors.Is(err, nativefill.ErrVendorLoginIncomplete) {
-		return errFillWaiting
+		return fmt.Errorf("%w: %v", errFillWaiting, err)
 	}
 	return err
 }
