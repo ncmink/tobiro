@@ -46,3 +46,38 @@ func TestStatusForProfileSharedGateway(t *testing.T) {
 		t.Fatalf("GovBKK card should be disconnected, got %s (%s)", st.State, st.Detail)
 	}
 }
+
+type fakeSessions map[string]domain.VPNSession
+
+func (f fakeSessions) Get(id string) (domain.VPNSession, bool) {
+	s, ok := f[id]
+	return s, ok
+}
+
+func TestSessionOwner(t *testing.T) {
+	group := []domain.VPNProfile{{ID: "gov"}, {ID: "egp"}}
+
+	if got := sessionOwner(group, fakeSessions{}); got != "" {
+		t.Fatalf("no sessions → %q, want none", got)
+	}
+	one := fakeSessions{
+		"egp": {State: domain.StateConnecting},
+		"gov": {State: domain.StateDisconnected},
+	}
+	if got := sessionOwner(group, one); got != "egp" {
+		t.Fatalf("one active session → %q, want egp", got)
+	}
+	two := fakeSessions{
+		"egp": {State: domain.StateConnected},
+		"gov": {State: domain.StateConnected},
+	}
+	if got := sessionOwner(group, two); got != "" {
+		t.Fatalf("two active sessions → %q, want none", got)
+	}
+
+	rememberOpened(domain.VPNProfile{ID: "gov"})
+	t.Cleanup(func() { rememberOpened(domain.VPNProfile{}) })
+	if got := sessionOwner(group, fakeSessions{}); got != "gov" {
+		t.Fatalf("last opened card → %q, want gov", got)
+	}
+}

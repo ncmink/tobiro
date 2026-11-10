@@ -210,6 +210,7 @@ func (p *Provider) ListVendorProfiles(_ context.Context) ([]domain.VendorProfile
 
 // OpenNativeClient launches the Ivanti GUI.
 func (p *Provider) OpenNativeClient(ctx context.Context, profile domain.VPNProfile) error {
+	rememberOpened(profile)
 	path := profile.ClientPath
 	if path == "" {
 		info, err := p.Detect(ctx)

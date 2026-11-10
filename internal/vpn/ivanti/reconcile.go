@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"tobiro/internal/domain"
 )
@@ -25,7 +26,6 @@ func ReconcileProfiles(
 	if len(profiles) == 0 || apply == nil {
 		return
 	}
-	_ = sessions
 	groups := groupByGateway(profiles)
 	for key, group := range groups {
 		host, port := splitGatewayKey(key)
@@ -39,10 +39,78 @@ func ReconcileProfiles(
 			}
 			continue
 		}
+		owner := ""
+		if len(group) > 1 && strings.TrimSpace(snap.activeConnection) == "" {
+			owner = sessionOwner(group, sessions)
+		}
 		for _, p := range group {
-			apply(p, statusForProfile(p, snap, len(group)))
+			if owner == "" || snap.gatewayStatus.State != domain.StateConnected {
+				apply(p, statusForProfile(p, snap, len(group)))
+				continue
+			}
+			if p.ID == owner {
+				apply(p, snap.gatewayStatus)
+				continue
+			}
+			apply(p, domain.VPNStatus{
+				State:  domain.StateDisconnected,
+				Known:  true,
+				Detail: "Ivanti is up on this gateway for another connection card.",
+			})
 		}
 	}
+}
+
+var (
+	openedMu sync.Mutex
+	opened   = make(map[string]string)
+)
+
+// rememberOpened records the card the user last opened Ivanti from, per
+// gateway. Opening the vendor GUI starts no Tobiro session, so this is the only
+// sign of which card a tunnel raised in the GUI belongs to.
+func rememberOpened(profile domain.VPNProfile) {
+	openedMu.Lock()
+	opened[gatewayKey(profile.Host, profile.Port)] = profile.ID
+	openedMu.Unlock()
+}
+
+func lastOpened(group []domain.VPNProfile) string {
+	if len(group) == 0 {
+		return ""
+	}
+	openedMu.Lock()
+	id := opened[gatewayKey(group[0].Host, group[0].Port)]
+	openedMu.Unlock()
+	for _, p := range group {
+		if p.ID == id {
+			return id
+		}
+	}
+	return ""
+}
+
+// sessionOwner returns the one card on a gateway that Tobiro has an active
+// session for, falling back to the card Ivanti was last opened from. It
+// returns "" when neither singles out one card.
+func sessionOwner(group []domain.VPNProfile, sessions SessionReader) string {
+	owner := ""
+	if sessions != nil {
+		for _, p := range group {
+			s, ok := sessions.Get(p.ID)
+			if !ok || !s.State.IsActive() {
+				continue
+			}
+			if owner != "" {
+				return ""
+			}
+			owner = p.ID
+		}
+	}
+	if owner != "" {
+		return owner
+	}
+	return lastOpened(group)
 }
 
 func groupByGateway(profiles []domain.VPNProfile) map[string][]domain.VPNProfile {

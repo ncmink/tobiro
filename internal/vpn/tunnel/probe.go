@@ -29,6 +29,11 @@ type Options struct {
 	// adapter description. Only Windows publishes descriptions; an adapter
 	// that is up and matches is enough to call the tunnel up.
 	AdapterHints []string
+
+	// RequireAdapter makes an up vendor adapter mandatory. Some clients keep a
+	// socket to the gateway while idle (Pulse Secure's service on Windows), so
+	// a control connection alone does not prove a tunnel there.
+	RequireAdapter bool
 }
 
 // Probe reports whether a tunnel to host:port is currently up.

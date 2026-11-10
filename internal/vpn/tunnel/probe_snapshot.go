@@ -56,6 +56,9 @@ func ProbeWith(ctx context.Context, opts Options) Reading {
 
 	snap := capture(ctx)
 	adapter, hasAdapter := snap.vendorAdapter(opts.AdapterHints)
+	if opts.RequireAdapter && !hasAdapter {
+		return Reading{Detail: "The vendor virtual adapter is not up."}
+	}
 
 	gatewayIPs := resolveGateway(ctx, opts.Host)
 	if len(gatewayIPs) == 0 {
@@ -73,6 +76,13 @@ func ProbeWith(ctx context.Context, opts Options) Reading {
 
 	if session && !ownedByClient && opts.Port != 80 && opts.Port != 443 {
 		ownedByClient = true
+	}
+
+	if opts.RequireAdapter {
+		if !session {
+			return Reading{Detail: "The vendor adapter is up, but not for this gateway."}
+		}
+		return adapterReading(adapter)
 	}
 
 	switch {
