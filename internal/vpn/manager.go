@@ -61,7 +61,6 @@ type cachedCapabilities struct {
 
 const (
 	capabilityTTL           = 30 * time.Second
-	watchInterval           = 2 * time.Second
 	burstInterval           = 400 * time.Millisecond
 	burstDuration           = 45 * time.Second
 	disconnectConfirmations = 3
@@ -402,23 +401,6 @@ func (m *Manager) RefreshAll(ctx context.Context) {
 	}
 	m.refreshIvantiStatuses(ctx, ivantiProfiles)
 	m.refreshTailscaleStatuses(ctx, tailscaleProfiles)
-}
-
-// StartWatching polls tunnel status until ctx is cancelled.
-func (m *Manager) StartWatching(ctx context.Context) {
-	go func() {
-		ticker := time.NewTicker(watchInterval)
-		defer ticker.Stop()
-		m.RefreshAll(ctx)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				m.RefreshAll(ctx)
-			}
-		}
-	}()
 }
 
 // confirmStatus applies hysteresis so a single missed netstat sample cannot

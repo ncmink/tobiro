@@ -33,7 +33,11 @@ type forwarder struct {
 
 	closeOnce sync.Once
 
-	active   atomic.Int64
+	active atomic.Int64
+	// stopped is set when the accept loop ends. After a deliberate close the
+	// tunnel is already marked closed; any other end means the local port is no
+	// longer being served.
+	stopped  atomic.Bool
 	mu       sync.Mutex
 	remoteOK *bool
 	lastErr  string
@@ -76,6 +80,7 @@ func describeBindError(spec domain.PortForward, err error) error {
 }
 
 func (f *forwarder) serve() {
+	defer f.stopped.Store(true)
 	for {
 		local, err := f.listener.Accept()
 		if err != nil {

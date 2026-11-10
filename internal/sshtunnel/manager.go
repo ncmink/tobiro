@@ -206,10 +206,17 @@ func (m *Manager) RefreshStatus(_ context.Context, profile domain.VPNProfile) {
 	}
 
 	m.mu.Lock()
-	_, held := m.tunnels[profile.ID]
+	t, held := m.tunnels[profile.ID]
+	if held && t.alive() {
+		m.mu.Unlock()
+		return
+	}
+	// A map entry whose supervisor or listener is gone is not a tunnel.
+	delete(m.tunnels, profile.ID)
 	m.mu.Unlock()
 	if held {
-		return
+		m.log.Warn("SSH tunnel for profile=%s is no longer running; releasing it", profile.Name)
+		t.close()
 	}
 
 	if current, ok := m.sessions.Get(profile.ID); ok && current.State == domain.StateConnected {

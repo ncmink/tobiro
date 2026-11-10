@@ -423,6 +423,68 @@ func TestRefreshLeavesALiveTunnelAlone(t *testing.T) {
 	}
 }
 
+// A tunnel that is still in the map but whose local port is no longer served is
+// not a tunnel. Treating the map entry as proof is how a dead tunnel stayed
+// "connected" forever.
+func TestRefreshReleasesATunnelWhoseListenerIsGone(t *testing.T) {
+	r := newRig(t)
+	r.trustTheServer(t)
+
+	if _, err := r.manager.Connect(context.Background(), "p1", "c1"); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+
+	r.manager.mu.Lock()
+	held := r.manager.tunnels["p1"]
+	r.manager.mu.Unlock()
+	held.mu.Lock()
+	for _, f := range held.forwarders {
+		f.close()
+	}
+	held.mu.Unlock()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for !held.forwarders[0].stopped.Load() && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	r.manager.RefreshAll(context.Background())
+
+	current, _ := r.sessions.Get("p1")
+	if current.State != domain.StateDisconnected {
+		t.Fatalf("state = %s, want disconnected", current.State)
+	}
+	r.manager.mu.Lock()
+	_, stillHeld := r.manager.tunnels["p1"]
+	r.manager.mu.Unlock()
+	if stillHeld {
+		t.Fatal("the dead tunnel is still held")
+	}
+}
+
+// The supervisor ending on its own means nothing will ever redial the tunnel.
+func TestRefreshReleasesATunnelWhoseSupervisorHasStopped(t *testing.T) {
+	r := newRig(t)
+	r.trustTheServer(t)
+
+	if _, err := r.manager.Connect(context.Background(), "p1", "c1"); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+
+	r.manager.mu.Lock()
+	held := r.manager.tunnels["p1"]
+	r.manager.mu.Unlock()
+	held.cancel()
+	<-held.done
+
+	r.manager.RefreshAll(context.Background())
+
+	current, _ := r.sessions.Get("p1")
+	if current.State != domain.StateDisconnected {
+		t.Fatalf("state = %s, want disconnected", current.State)
+	}
+}
+
 func TestShutdownClosesEveryTunnel(t *testing.T) {
 	r := newRig(t)
 	r.trustTheServer(t)

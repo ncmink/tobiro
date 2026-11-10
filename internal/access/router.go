@@ -21,6 +21,7 @@ package access
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"tobiro/internal/domain"
 )
@@ -176,6 +177,28 @@ func (r *Router) RefreshStatus(ctx context.Context, profile domain.VPNProfile) {
 func (r *Router) RefreshAll(ctx context.Context) {
 	r.vpn.RefreshAll(ctx)
 	r.ssh.RefreshAll(ctx)
+}
+
+// StartWatching re-reads reality for every profile, VPN and SSH alike, every
+// interval until ctx is cancelled.
+//
+// Status must not depend on the window asking: an SSH tunnel has no vendor
+// client whose state could be read later, so without this sweep a tunnel that
+// died stays "connected" until something happens to list the connections.
+func (r *Router) StartWatching(ctx context.Context, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		r.RefreshAll(ctx)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				r.RefreshAll(ctx)
+			}
+		}
+	}()
 }
 
 // For resolves the mechanism that owns a profile.

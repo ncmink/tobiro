@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -124,14 +123,12 @@ func FindVendorWindows(hints []string) []VendorWindow {
 // LoginFields returns the enabled, visible Win32 edit controls inside a window,
 // split into plain text and password fields, each ordered top to bottom.
 //
-// A field is a password field when the edit control says so (ES_PASSWORD or a
-// password character). WinForms dialogs such as Forcepoint's "User
-// Authentication" report neither, so those fields are classified by the label
-// beside them ("User Name:", "Password:"), and as a last resort a pair of
-// fields is read as username above password.
+// The edit and static (label) controls are collected here; deciding which edit
+// is the username and which the password is classifyFields' job, by label
+// position, because WinForms dialogs report neither a password style nor
+// anything but a plain pane.
 func LoginFields(hwnd windows.HWND) (plain, secret []windows.HWND) {
-	var edits []control
-	var labels []control
+	var edits, labels []control
 	for _, child := range childWindows(hwnd) {
 		if !windows.IsWindowVisible(child) {
 			continue
@@ -140,113 +137,29 @@ func LoginFields(hwnd windows.HWND) (plain, secret []windows.HWND) {
 		switch {
 		case strings.Contains(class, "edit"):
 			if isEnabled(child) {
-				edits = append(edits, control{hwnd: child, rect: windowRect(child)})
+				edits = append(edits, control{id: uintptr(child), rect: toRect(windowRect(child))})
 			}
 		case strings.Contains(class, "static"):
 			if text := strings.TrimSpace(windowTitle(child)); text != "" {
-				labels = append(labels, control{hwnd: child, rect: windowRect(child), text: text})
-			}
-		}
-	}
-	sort.SliceStable(edits, func(i, j int) bool { return edits[i].rect.Top < edits[j].rect.Top })
-
-	var unknown []control
-	for _, e := range edits {
-		switch {
-		case isPasswordEdit(e.hwnd):
-			secret = append(secret, e.hwnd)
-		default:
-			switch labelKind(e, labels) {
-			case kindPassword:
-				secret = append(secret, e.hwnd)
-			case kindUsername:
-				plain = append(plain, e.hwnd)
-			default:
-				unknown = append(unknown, e)
+				labels = append(labels, control{id: uintptr(child), rect: toRect(windowRect(child)), text: text})
 			}
 		}
 	}
 
-	// Only read a bare pair as username-over-password in a window that labels
-	// a password somewhere, so a settings window's two text boxes are not
-	// mistaken for a login form.
-	if len(secret) == 0 && len(plain) == 0 && len(unknown) == 2 && hasPasswordLabel(labels) {
-		return []windows.HWND{unknown[0].hwnd}, []windows.HWND{unknown[1].hwnd}
+	p, sec := classifyFields(edits, labels, func(c control) bool {
+		return isPasswordEdit(windows.HWND(c.id))
+	})
+	for _, c := range p {
+		plain = append(plain, windows.HWND(c.id))
 	}
-	for _, e := range unknown {
-		plain = append(plain, e.hwnd)
+	for _, c := range sec {
+		secret = append(secret, windows.HWND(c.id))
 	}
 	return plain, secret
 }
 
-type control struct {
-	hwnd windows.HWND
-	rect windows.Rect
-	text string
-}
-
-type fieldKind int
-
-const (
-	kindUnknown fieldKind = iota
-	kindUsername
-	kindPassword
-)
-
-var (
-	passwordLabels = []string{"password", "passcode", "รหัสผ่าน"}
-	usernameLabels = []string{"user", "login", "account", "e-mail", "email", "ชื่อผู้ใช้"}
-)
-
-// labelKind classifies an edit by the nearest label on its row to the left, or
-// directly above it.
-func labelKind(edit control, labels []control) fieldKind {
-	best := -1
-	bestDist := int32(1 << 30)
-	editMid := (edit.rect.Top + edit.rect.Bottom) / 2
-	for i, l := range labels {
-		var dist int32
-		switch {
-		case l.rect.Right <= edit.rect.Left+8 && l.rect.Top <= editMid && l.rect.Bottom >= editMid:
-			dist = edit.rect.Left - l.rect.Right
-		case l.rect.Bottom <= edit.rect.Top+4 && l.rect.Left < edit.rect.Right && l.rect.Right > edit.rect.Left:
-			dist = edit.rect.Top - l.rect.Bottom + 1000
-		default:
-			continue
-		}
-		if dist < bestDist {
-			best, bestDist = i, dist
-		}
-	}
-	if best < 0 {
-		return kindUnknown
-	}
-	text := strings.ToLower(labels[best].text)
-	switch {
-	case containsAny(text, passwordLabels):
-		return kindPassword
-	case containsAny(text, usernameLabels):
-		return kindUsername
-	}
-	return kindUnknown
-}
-
-func hasPasswordLabel(labels []control) bool {
-	for _, l := range labels {
-		if containsAny(strings.ToLower(l.text), passwordLabels) {
-			return true
-		}
-	}
-	return false
-}
-
-func containsAny(s string, words []string) bool {
-	for _, w := range words {
-		if strings.Contains(s, w) {
-			return true
-		}
-	}
-	return false
+func toRect(r windows.Rect) rect {
+	return rect{Left: r.Left, Top: r.Top, Right: r.Right, Bottom: r.Bottom}
 }
 
 func isPasswordEdit(hwnd windows.HWND) bool {

@@ -248,6 +248,29 @@ func (t *tunnel) isClosed() bool {
 	return t.closed
 }
 
+// alive reports whether the tunnel still exists in any useful sense: it was not
+// closed, its supervisor is still running (so it will redial after a drop), and
+// every local port is still being served. A tunnel that fails this is only a
+// map entry, and must not be taken as proof that a session is up.
+func (t *tunnel) alive() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return false
+	}
+	select {
+	case <-t.done:
+		return false
+	default:
+	}
+	for _, f := range t.forwarders {
+		if f.stopped.Load() {
+			return false
+		}
+	}
+	return true
+}
+
 // forwards reports what this tunnel is lending.
 func (t *tunnel) forwards() []domain.PortForward {
 	t.mu.Lock()

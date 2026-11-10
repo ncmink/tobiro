@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -26,6 +27,10 @@ import (
 
 // appVersion is stamped into the Settings screen and release checks.
 const appVersion = "0.0.7"
+
+// statusWatchInterval is how often connection status is re-read in the
+// background, so a dead tunnel shows as disconnected within a few seconds.
+const statusWatchInterval = 2 * time.Second
 
 // App is the Wails binding surface: use-case entry points only.
 //
@@ -118,7 +123,8 @@ func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) 
 
 	a.restoreNativeFillProfile()
 
-	a.vpn.StartWatching(ctx)
+	// One sweep covers VPN profiles and SSH tunnels alike.
+	a.access.StartWatching(ctx, statusWatchInterval)
 	a.startFillHotkey()
 	return nil
 }

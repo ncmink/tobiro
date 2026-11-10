@@ -62,7 +62,9 @@ func ProbeWith(ctx context.Context, opts Options) Reading {
 
 	gatewayIPs := resolveGateway(ctx, opts.Host)
 	if len(gatewayIPs) == 0 {
-		if hasAdapter {
+		// An adapter alone cannot say whose tunnel it is, so a profile whose
+		// gateway is unknown does not claim it.
+		if hasAdapter && !opts.RequireAdapter {
 			return adapterReading(adapter)
 		}
 		return Reading{Detail: "The gateway address could not be resolved."}

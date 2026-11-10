@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"tobiro/internal/domain"
 )
@@ -279,5 +281,41 @@ func TestAHandEditedLoopIsStoppedRatherThanFollowed(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "too many connections") {
 		t.Fatalf("expected the depth limit to be reported, got %v", err)
+	}
+}
+
+// counter is a connector that only counts how often it was swept.
+type counter struct {
+	mechanism
+	sweeps *atomic.Int64
+}
+
+func (c counter) RefreshAll(context.Context) { c.sweeps.Add(1) }
+
+// An SSH tunnel has no vendor client to read, so the background sweep is the
+// only thing that notices a dead one. It must reach both mechanisms, and keep
+// going until it is told to stop.
+func TestWatchingSweepsBothMechanismsUntilCancelled(t *testing.T) {
+	var vpnSweeps, sshSweeps atomic.Int64
+	router := NewRouter(nil, nil, nil,
+		counter{sweeps: &vpnSweeps}, counter{sweeps: &sshSweeps})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	router.StartWatching(ctx, 5*time.Millisecond)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for (vpnSweeps.Load() < 3 || sshSweeps.Load() < 3) && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if vpnSweeps.Load() < 3 || sshSweeps.Load() < 3 {
+		t.Fatalf("watcher did not keep sweeping: vpn=%d ssh=%d", vpnSweeps.Load(), sshSweeps.Load())
+	}
+
+	cancel()
+	time.Sleep(30 * time.Millisecond)
+	settled := sshSweeps.Load()
+	time.Sleep(50 * time.Millisecond)
+	if sshSweeps.Load() != settled {
+		t.Fatal("watcher kept sweeping after cancel")
 	}
 }

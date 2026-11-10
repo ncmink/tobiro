@@ -25,3 +25,15 @@ func TestFillNativeLoginSkipsEmptyCredential(t *testing.T) {
 		t.Fatalf("empty credential should be a no-op: %v", err)
 	}
 }
+
+// On Windows the "User Authentication" dialog is drawn by sggui.exe and its
+// title never says Forcepoint, so the process name is the only handle on it.
+func TestWindowsLoginDialogProcessIsRecognised(t *testing.T) {
+	p := &Provider{}
+	if !p.OwnsNativeProcess("sggui.exe") {
+		t.Fatal("sggui.exe must be treated as the Forcepoint client")
+	}
+	if p.OwnsNativeProcess("chrome.exe") {
+		t.Fatal("a browser must not be treated as the Forcepoint client")
+	}
+}
