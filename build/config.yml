@@ -9,7 +9,7 @@ info:
   description: "Desktop access manager for DevOps engineers."
   copyright: "© 2026, Tobiro"
   comments: "Part of the biebie.net product family."
-  version: "0.0.5"
+  version: "0.0.6"
 
 dev_mode:
   root_path: .
