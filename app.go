@@ -26,7 +26,7 @@ import (
 )
 
 // appVersion is stamped into the Settings screen and release checks.
-const appVersion = "0.0.7"
+const appVersion = "0.0.8"
 
 // statusWatchInterval is how often connection status is re-read in the
 // background, so a dead tunnel shows as disconnected within a few seconds.
