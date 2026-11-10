@@ -59,8 +59,26 @@ func fillVendorLoginWindow(ctx context.Context, processHints []string, username,
 		return nil
 	}
 
-	// No standard controls: type into the field the user clicked, but only in
-	// a window the vendor process itself owns and that is in front.
+	// Web-based clients (Electron) expose their inputs through UI Automation.
+	for _, w := range windows {
+		if w.TitleOnly {
+			continue
+		}
+		if BlockedByElevation(w.HWND) {
+			return ErrVendorElevated
+		}
+		filled, err := fillWithUIA(ctx, w.HWND, username, password)
+		if err != nil {
+			return err
+		}
+		if filled {
+			return nil
+		}
+	}
+
+	// Last resort: type into the field the user clicked, but only in a window
+	// the vendor process itself owns, that is in front, and whose focus is in a
+	// text field. Otherwise Ctrl+A would select the whole page.
 	var front *VendorWindow
 	for i := range windows {
 		if !windows[i].TitleOnly && IsForeground(windows[i].HWND) {
@@ -75,6 +93,9 @@ func fillVendorLoginWindow(ctx context.Context, processHints []string, username,
 		return ErrVendorElevated
 	}
 	WaitForModifierRelease(ctx)
+	if !FocusIsInEditField() {
+		return ErrVendorClickUsername
+	}
 	if username != "" {
 		if err := TypeIntoFocused(username); err != nil {
 			return err
@@ -86,6 +107,9 @@ func fillVendorLoginWindow(ctx context.Context, processHints []string, username,
 				return err
 			}
 			time.Sleep(50 * time.Millisecond)
+			if !FocusIsInEditField() {
+				return ErrVendorClickPassword
+			}
 		}
 		if err := TypeIntoFocused(password); err != nil {
 			return err
@@ -93,6 +117,10 @@ func fillVendorLoginWindow(ctx context.Context, processHints []string, username,
 	}
 	return nil
 }
+
+// ErrVendorClickPassword means the username was typed but Tab did not land in
+// the password field.
+var ErrVendorClickPassword = errors.New("username filled; click the password field and press the fill shortcut again")
 
 // ProbeVendorLoginWindow reports whether the user can press the fill shortcut.
 func ProbeVendorLoginWindow(processHints []string) error {
