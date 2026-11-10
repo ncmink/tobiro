@@ -50,6 +50,31 @@ func TestRequireAdapterNeedsThisGateway(t *testing.T) {
 	}
 }
 
+func TestRequireAdapterUnknownGatewayStaysDisconnected(t *testing.T) {
+	withSnapshot(t, &snapshot{
+		tcp:     idlePulseSocket,
+		tunnels: []tunnelAddr{{ip: "10.8.0.4", iface: "Ethernet 3", desc: "Juniper Networks Virtual Adapter"}},
+	})
+
+	opts := ivantiWindows
+	opts.Host = ""
+	if reading := ProbeWith(context.Background(), opts); reading.Connected {
+		t.Fatalf("a card with no gateway must not claim someone else's tunnel: %+v", reading)
+	}
+}
+
+// Without RequireAdapter (Forcepoint, FortiClient) the vendor control socket is
+// still enough, so those providers keep behaving as before.
+func TestWithoutRequireAdapterControlSocketStillCounts(t *testing.T) {
+	withSnapshot(t, &snapshot{tcp: idlePulseSocket})
+
+	opts := ivantiWindows
+	opts.RequireAdapter = false
+	if reading := ProbeWith(context.Background(), opts); !reading.Connected {
+		t.Fatalf("a vendor-owned control socket should still count for other providers: %+v", reading)
+	}
+}
+
 func TestRequireAdapterConnectedWithAdapterAndSocket(t *testing.T) {
 	withSnapshot(t, &snapshot{
 		tcp:     idlePulseSocket,
