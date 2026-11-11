@@ -22,6 +22,12 @@ Add these **GitHub repository secrets** on [ncmink/tobiro](https://github.com/nc
 | `APPLE_API_ISSUER_ID` | Issuer ID |
 | `UPDATER_SIGNING_KEY` | Full PEM text of `updater.key` (pair of committed `updater.key.pub`) |
 | `PROTOCOL_TOKEN` | PAT to clone private `ncmink/biebie-protocol` |
+| `ES_USERNAME` | SSL.com account username (eSigner Authenticode signing of `Tobiro.exe` + installer) |
+| `ES_PASSWORD` | SSL.com account password |
+| `CREDENTIAL_ID` | eSigner credential ID (order page → **Show my signing credentials**) |
+| `ES_TOTP_SECRET` | Base32 secret from the eSigner OTP QR code (`secret=...`), not a 6-digit code |
+
+Each release spends two eSigner signings (app exe + installer).
 
 **Protocol dependency:** Tobiro’s peer RPC sets `AccessProfile.Kind` (`vpn` / `ssh`).
 That field must exist on **`ncmink/biebie-protocol` `master`** before release CI can

@@ -181,7 +181,7 @@ jobs:
           security delete-keychain "$RUNNER_TEMP/codesign.keychain-db" 2>/dev/null || true
 
   windows:
-    name: Build Windows (NSIS + updater zip)
+    name: Build Windows (signed NSIS + updater zip)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -226,8 +226,32 @@ jobs:
       - name: Install wails3
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
 
-      - name: Package NSIS installer
-        run: wails3 task windows:package APP_VERSION=${{ env.APP_VERSION }} INSTALL_SCOPE=user
+      - name: Build Tobiro.exe
+        run: wails3 task windows:build APP_VERSION=${{ env.APP_VERSION }}
+
+      # The exe is signed before NSIS packs it. `windows:package` cannot be used
+      # here: its installer task depends on `build` and would overwrite the
+      # signed exe with a fresh unsigned one.
+      - name: Authenticode sign Tobiro.exe
+        uses: sslcom/esigner-codesign@develop
+        with:
+          command: sign
+          username: ${{ secrets.ES_USERNAME }}
+          password: ${{ secrets.ES_PASSWORD }}
+          credential_id: ${{ secrets.CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
+          file_path: ${{ github.workspace }}\bin\${{ env.APP_NAME }}.exe
+          override: true
+          environment_name: PROD
+          malware_block: false
+
+      # Mirrors `create:nsis:installer` in build/windows/Taskfile.yml; keep the
+      # flags in step with it.
+      - name: Build NSIS installer
+        working-directory: build/windows/nsis
+        run: |
+          wails3 generate webview2bootstrapper -dir "${{ github.workspace }}\build\windows\nsis"
+          makensis -DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user -DARG_WAILS_AMD64_BINARY="${{ github.workspace }}\bin\${{ env.APP_NAME }}.exe" project.nsi
 
       - name: Rename artifacts
         shell: pwsh
@@ -235,6 +259,28 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Move-Item "bin\$env:APP_NAME-*-installer.exe" "dist\$env:APP_NAME-$env:VERSION-windows-amd64-installer.exe"
           Compress-Archive -Path "bin\$env:APP_NAME.exe" -DestinationPath "dist\$env:APP_NAME-$env:VERSION-windows-amd64.zip"
+
+      - name: Authenticode sign installer
+        uses: sslcom/esigner-codesign@develop
+        with:
+          command: sign
+          username: ${{ secrets.ES_USERNAME }}
+          password: ${{ secrets.ES_PASSWORD }}
+          credential_id: ${{ secrets.CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
+          file_path: ${{ github.workspace }}\dist\${{ env.APP_NAME }}-${{ env.VERSION }}-windows-amd64-installer.exe
+          override: true
+          environment_name: PROD
+          malware_block: false
+
+      - name: Verify Authenticode signatures
+        shell: pwsh
+        run: |
+          Get-ChildItem "bin\$env:APP_NAME.exe", "dist\*.exe" | ForEach-Object {
+            $sig = Get-AuthenticodeSignature $_.FullName
+            if ($sig.Status -ne 'Valid') { throw "$($_.Name): signature $($sig.Status)" }
+            "$($_.Name): $($sig.SignerCertificate.Subject)"
+          }
 
       - name: Sign updater asset
         env:
