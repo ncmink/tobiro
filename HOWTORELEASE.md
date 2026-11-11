@@ -29,6 +29,27 @@ Add these **GitHub repository secrets** on [ncmink/tobiro](https://github.com/nc
 
 Each release spends two eSigner signings (app exe + installer).
 
+## eSigner signing quota (SSL.com)
+
+Tobiro’s Windows job calls eSigner twice per successful release (Authenticode on
+`Tobiro.exe` and on the NSIS installer). Test runs and re-runs of the Windows job
+also consume signings.
+
+**Where to check usage**
+
+1. Log in at [ssl.com](https://www.ssl.com/) → **Orders** (or open order **co-021lejtg987**).
+2. Open the issued **Personal ID Code Signing** order (status **eSigner active**).
+3. Scroll to **END ENTITY CERTIFICATES** → **Show Details**.
+4. Read **Signings This Month** (total signings on this certificate for the current
+   month). On **Current eSigner Plan**, confirm tier (**Tier 1 Annual** = **240
+   signings / year** with rollover while the subscription stays active).
+
+**Rough budget:** `used ≈ 2 × (number of release Windows jobs that completed both
+sign steps)`. Compare **Signings This Month** (and annual allowance) before kicking
+off an extra `workflow_dispatch` test.
+
+SSL.com docs: [How to view eSigner signature usage](https://www.ssl.com/guide/esigner-pricing-for-code-signing/).
+
 **Protocol dependency:** Tobiro’s peer RPC sets `AccessProfile.Kind` (`vpn` / `ssh`).
 That field must exist on **`ncmink/biebie-protocol` `master`** before release CI can
 compile. If CI fails with `unknown field Kind`, push the protocol repo first (see
