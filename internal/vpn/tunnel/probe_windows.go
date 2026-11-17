@@ -50,6 +50,8 @@ var vpnAdapterHints = []string{
 	"forticlient",
 	"forcepoint",
 	"stonesoft",
+	"openvpn",
+	"tap-windows",
 }
 
 func collect(_ context.Context) *snapshot {

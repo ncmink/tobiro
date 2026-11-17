@@ -12,6 +12,7 @@ const (
 	ProviderFortiClient VPNProvider = "forticlient"
 	ProviderTailscale   VPNProvider = "tailscale"
 	ProviderSurfshark   VPNProvider = "surfshark"
+	ProviderOpenVPN     VPNProvider = "openvpn"
 
 	// ProviderMacOSVPN covers the VPN services configured in macOS System
 	// Settings — L2TP over IPsec, IKEv2 and Cisco IPsec. macOS owns these, so
@@ -90,6 +91,7 @@ func SupportedProviders() []ProviderInfo {
 		{ID: ProviderTailscale, DisplayName: "Tailscale", Vendor: "Tailscale", DefaultPort: 41641},
 		{ID: ProviderSurfshark, DisplayName: "Surfshark VPN", Vendor: "Surfshark", DefaultPort: 51820},
 		{ID: ProviderMacOSVPN, DisplayName: "macOS VPN (L2TP/IPsec, IKEv2)", Vendor: "Apple", DefaultPort: 500},
+		{ID: ProviderOpenVPN, DisplayName: "OpenVPN Connect", Vendor: "OpenVPN", DefaultPort: 1194},
 	}
 	for i := range providers {
 		providers[i].RequiresEndpoint = providers[i].ID.RequiresEndpoint()
@@ -138,7 +140,7 @@ func (p VPNProvider) DisplayName() string {
 // address in System Settings.
 func (p VPNProvider) RequiresEndpoint() bool {
 	switch p {
-	case ProviderTailscale, ProviderSurfshark, ProviderMacOSVPN:
+	case ProviderTailscale, ProviderSurfshark, ProviderMacOSVPN, ProviderOpenVPN:
 		return false
 	default:
 		return true
@@ -155,7 +157,7 @@ func (p VPNProvider) RequiresEndpoint() bool {
 // account per customer, which is why a profile owns a credential list at all.
 func (p VPNProvider) ManagesOwnAccount() bool {
 	switch p {
-	case ProviderTailscale, ProviderSurfshark, ProviderMacOSVPN:
+	case ProviderTailscale, ProviderSurfshark, ProviderMacOSVPN, ProviderOpenVPN:
 		return true
 	default:
 		return false
@@ -172,6 +174,8 @@ func (p VPNProvider) EndpointLabel() string {
 		return "Surfshark locations"
 	case ProviderMacOSVPN:
 		return "macOS VPN service"
+	case ProviderOpenVPN:
+		return "OpenVPN Connect profile"
 	default:
 		return ""
 	}
@@ -194,6 +198,9 @@ func (p VPNProvider) EndpointNote() string {
 			"password stay there. Connect it in System Settings too, because macOS will " +
 			"not share its IPSec shared secret with an app; Tobiro then reports " +
 			"the tunnel and can disconnect it."
+	case ProviderOpenVPN:
+		return "Pick a profile already imported into OpenVPN Connect. Tobiro opens the app for you " +
+			"and reports which profile is connected. Username and password stay in OpenVPN Connect."
 	default:
 		return ""
 	}
@@ -223,6 +230,12 @@ func (p VPNProvider) VendorProfileField() VendorProfileField {
 		return VendorProfileField{
 			Label:    "Tailscale account",
 			Hint:     "Pick a profile (nickname or tailnet). Login email works only if it is unique on this machine.",
+			Required: true,
+		}
+	case ProviderOpenVPN:
+		return VendorProfileField{
+			Label:    "OpenVPN Connect profile",
+			Hint:     "Profile name as shown in OpenVPN Connect. Add one card per profile so Tobiro can tell them apart.",
 			Required: true,
 		}
 	default:

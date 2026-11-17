@@ -27,6 +27,7 @@ import (
 	"tobiro/internal/vpn/forticlient"
 	"tobiro/internal/vpn/ivanti"
 	"tobiro/internal/vpn/macosvpn"
+	"tobiro/internal/vpn/openvpn"
 	"tobiro/internal/vpn/surfshark"
 	"tobiro/internal/vpn/tailscale"
 )
@@ -164,6 +165,7 @@ func buildApp() (*App, error) {
 	registry.Register(forticlient.New())
 	registry.Register(tailscale.New())
 	registry.Register(surfshark.New())
+	registry.Register(openvpn.New())
 	registry.Register(macosvpn.New())
 	registerDevelopmentProviders(registry)
 

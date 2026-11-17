@@ -215,6 +215,7 @@ Tobiro launches the vendor GUI instead of inventing arguments.
 | Tailscale | yes | all | yes, documented CLI | yes | open native client |
 | Surfshark VPN | yes | macOS | no documented CLI | macOS | open native client |
 | macOS VPN (L2TP/IPsec, IKEv2) | yes | macOS | disconnect only, `scutil --nc` | macOS | open Network settings |
+| OpenVPN Connect | yes | macOS, Windows | no documented connect CLI (`--list-profiles` only) | macOS, Windows | open native client |
 
 "Pending verification" means a platform CLI was detected (`pulsesvc` /
 `pulselauncher.exe` on Linux and Windows for Ivanti, `fortivpn` on Linux for

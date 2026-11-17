@@ -307,7 +307,7 @@ export function RefreshStatus(): $CancellablePromise<domain$0.SessionView[] | nu
 }
 
 /**
- * ResetFillShortcut restores Command+I.
+ * ResetFillShortcut restores the platform default (⌘I, or Ctrl+Shift+I on Windows).
  */
 export function ResetFillShortcut(): $CancellablePromise<void> {
     return $Call.ByID(3787756871);

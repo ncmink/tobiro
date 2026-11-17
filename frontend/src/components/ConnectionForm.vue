@@ -109,7 +109,7 @@ const checksForcepointStatus = computed(() => form.provider === 'forcepoint')
 const profileLabel = computed(() => vendorProfileField.value?.label ?? 'Vendor profile')
 
 /** Adapters that implement VendorProfileLister on this platform. */
-const vendorProfileListerProviders = new Set(['macosvpn', 'tailscale', 'ivanti'])
+const vendorProfileListerProviders = new Set(['macosvpn', 'tailscale', 'ivanti', 'openvpn'])
 
 /**
  * What the provider already has configured on this machine.
@@ -136,11 +136,14 @@ watch(
       if (timer) clearTimeout(timer)
     })
     discovering.value = true
-    const timeoutHint = provider === 'tailscale'
-      ? 'Could not load Tailscale accounts. Enter a nickname or tailnet from tailscale switch --list.'
-      : provider === 'ivanti'
-        ? 'Could not load Ivanti connections. Enter the connection name shown in Ivanti Secure Access.'
-        : 'Could not load saved VPN connections. Enter the name shown in System Settings.'
+    const timeoutHint =
+      provider === 'tailscale'
+        ? 'Could not load Tailscale accounts. Enter a nickname or tailnet from tailscale switch --list.'
+        : provider === 'ivanti'
+          ? 'Could not load Ivanti connections. Enter the connection name shown in Ivanti Secure Access.'
+          : provider === 'openvpn'
+            ? 'Could not load OpenVPN Connect profiles. Enter the profile name shown in OpenVPN Connect.'
+            : 'Could not load saved VPN connections. Enter the name shown in System Settings.'
     try {
       const options = await Promise.race([
         ListVendorProfiles(provider),
@@ -157,7 +160,9 @@ watch(
             ? 'Could not load Tailscale accounts. You can enter a nickname or tailnet below.'
             : provider === 'ivanti'
               ? 'Could not load Ivanti connections. You can enter the connection name below.'
-              : 'Could not load saved VPN connections. You can enter the name below.',
+              : provider === 'openvpn'
+                ? 'Could not load OpenVPN Connect profiles. You can enter the profile name below.'
+                : 'Could not load saved VPN connections. You can enter the name below.',
         )
       }
     } finally {

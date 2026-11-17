@@ -489,6 +489,7 @@ export enum VPNProvider {
     ProviderFortiClient = "forticlient",
     ProviderTailscale = "tailscale",
     ProviderSurfshark = "surfshark",
+    ProviderOpenVPN = "openvpn",
 
     /**
      * ProviderMacOSVPN covers the VPN services configured in macOS System
