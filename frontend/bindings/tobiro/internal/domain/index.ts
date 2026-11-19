@@ -24,6 +24,7 @@ export type {
     SSHSettings,
     SessionView,
     StartupState,
+    Tag,
     TunnelInput,
     VPNProfile,
     VendorProfileField,

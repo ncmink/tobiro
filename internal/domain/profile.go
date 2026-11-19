@@ -70,6 +70,9 @@ type VPNProfile struct {
 
 	Notes string `json:"notes"`
 
+	// Tags are user-defined key/value labels. The Name tag is virtual (profile.Name).
+	Tags []Tag `json:"tags,omitempty"`
+
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -142,6 +145,8 @@ type ProfileInput struct {
 
 	// SSH is ignored unless Kind is KindSSH.
 	SSH SSHSettings `json:"ssh"`
+
+	Tags []Tag `json:"tags"`
 }
 
 // Normalise trims the input and fills in what the form is allowed to omit, so
@@ -167,6 +172,7 @@ func (in ProfileInput) Normalise() ProfileInput {
 	} else {
 		in.SSH = SSHSettings{}
 	}
+	in.Tags = NormaliseTags(in.Tags)
 	return in
 }
 
@@ -189,6 +195,9 @@ func (in ProfileInput) Validate() error {
 	}
 	if len(in.Notes) > 2000 {
 		return errors.New("notes are too long (max 2000 characters)")
+	}
+	if err := ValidateTags(in.Tags); err != nil {
+		return err
 	}
 
 	if in.Kind == KindSSH {

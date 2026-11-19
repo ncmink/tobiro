@@ -116,6 +116,7 @@ func (s *Service) Create(in domain.ProfileInput) (domain.VPNProfile, error) {
 		ClientPath:    in.ClientPath,
 		SSH:           in.SSH,
 		Notes:         in.Notes,
+		Tags:          in.Tags,
 		CredentialIDs: []string{},
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -229,6 +230,7 @@ func (s *Service) Update(id string, in domain.ProfileInput) (domain.VPNProfile, 
 			d.Profiles[i].VendorProfile = in.VendorProfile
 			d.Profiles[i].ClientPath = in.ClientPath
 			d.Profiles[i].Notes = in.Notes
+			d.Profiles[i].Tags = in.Tags
 
 			switch {
 			case in.Kind != domain.KindSSH:

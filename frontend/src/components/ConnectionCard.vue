@@ -9,6 +9,7 @@ import ProviderIcon from '@/components/ProviderIcon.vue'
 import { descendants, type ChainNode } from '@/lib/chain'
 import { canConnect, connectionCredentials, formatDuration, isActive, stateStyle } from '@/lib/state'
 import { canFillNativeLogin } from '@/lib/nativeFill'
+import { normaliseStoredTags } from '@/lib/tags'
 import { useConnectionsStore } from '@/stores/connections'
 import { useFillShortcutStore } from '@/stores/fillShortcut'
 import { useSessionsStore } from '@/stores/sessions'
@@ -30,6 +31,7 @@ const emit = defineEmits<{
   disconnect: [connection: main.ConnectionView]
   openNative: [connection: main.ConnectionView]
   menu: [connection: main.ConnectionView, event: MouseEvent]
+  filterTag: [query: string]
 }>()
 
 const connectionsStore = useConnectionsStore()
@@ -153,6 +155,14 @@ const manualHint = computed(() => {
 })
 const connectionHint = computed(() => (manualClient.value ? '' : blockedReason.value))
 
+const tagChips = computed(() => normaliseStoredTags(props.connection.profile.tags ?? []))
+const extraTagCount = computed(() => Math.max(0, tagChips.value.length - 3))
+const visibleTagChips = computed(() => tagChips.value.slice(0, 3))
+
+function filterByTag(key: string, value: string) {
+  emit('filterTag', `${key}=${value}`)
+}
+
 function openMenu(event: MouseEvent) {
   const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
   emit('menu', props.connection, new MouseEvent('contextmenu', {
@@ -203,6 +213,19 @@ function openMenu(event: MouseEvent) {
         </p>
         <p v-if="showThrough" class="mt-1 text-xs text-ink-muted">Via {{ requires?.name }}</p>
         <p v-else-if="!nested && missingParent" class="mt-1 text-xs text-warn">Parent connection unavailable</p>
+        <div v-if="visibleTagChips.length" class="mt-2 flex flex-wrap items-center gap-1">
+          <button
+            v-for="tag in visibleTagChips"
+            :key="tag.key"
+            type="button"
+            class="no-drag max-w-full truncate rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-ink-muted transition hover:border-brand/40 hover:text-brand"
+            :title="`${tag.key}=${tag.value}`"
+            @click="filterByTag(tag.key, tag.value)"
+          >
+            {{ tag.key }}={{ tag.value }}
+          </button>
+          <span v-if="extraTagCount" class="text-[10px] text-ink-faint">+{{ extraTagCount }}</span>
+        </div>
       </div>
 
       <div class="connection-actions">

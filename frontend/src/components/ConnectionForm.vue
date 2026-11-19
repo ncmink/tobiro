@@ -5,7 +5,9 @@ import { ListVendorProfiles } from '@/api'
 import type { domain, main } from '@/lib/bindings'
 import AppModal from '@/components/AppModal.vue'
 import AppSelect from '@/components/AppSelect.vue'
+import TagEditor from '@/components/TagEditor.vue'
 import { errorMessage } from '@/lib/state'
+import { normaliseStoredTags } from '@/lib/tags'
 
 const props = defineProps<{
   connection?: main.ConnectionView | null
@@ -92,6 +94,11 @@ watch(
   },
 )
 
+const userTags = ref<domain.Tag[]>(
+  props.connection?.profile.tags?.map((t) => ({ key: t.key, value: t.value })) ?? [],
+)
+const tagEditor = ref<InstanceType<typeof TagEditor> | null>(null)
+
 const saving = ref(false)
 const error = ref('')
 
@@ -173,10 +180,15 @@ watch(
   { immediate: true },
 )
 
+function storedTags(): domain.Tag[] {
+  return normaliseStoredTags(userTags.value).map((t) => ({ key: t.key, value: t.value }))
+}
+
 function submit() {
   error.value = ''
-  if (form.name.trim() === '') {
-    error.value = 'Give this connection a name.'
+  const tagProblem = tagEditor.value?.validate()
+  if (tagProblem) {
+    error.value = tagProblem
     return
   }
 
@@ -207,6 +219,7 @@ function submit() {
     vendorProfile: vendorProfileField.value?.label || props.connection?.profile.provider === form.provider ? form.vendorProfile.trim() : '',
     clientPath: form.clientPath.trim(),
     notes: form.notes,
+    tags: storedTags(),
   } as domain.ProfileInput)
 }
 
@@ -231,6 +244,7 @@ function submitSSH() {
     clientPath: '',
     notes: form.notes,
     ssh: { user: '', forwards: [] },
+    tags: storedTags(),
   } as unknown as domain.ProfileInput)
 }
 
@@ -254,16 +268,8 @@ defineExpose({
   >
     <form class="space-y-4" @submit.prevent="submit">
       <div>
-        <label class="mb-1.5 block text-sm font-medium text-ink" for="conn-name">
-          Connection name
-        </label>
-        <input
-          id="conn-name"
-          v-model="form.name"
-          type="text"
-          placeholder=""
-          class="w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand"
-        />
+        <h3 class="mb-1.5 text-sm font-medium text-ink">Tags</h3>
+        <TagEditor ref="tagEditor" v-model:name="form.name" v-model:tags="userTags" />
       </div>
 
       <div>

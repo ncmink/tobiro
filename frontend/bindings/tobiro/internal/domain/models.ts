@@ -292,6 +292,7 @@ export interface ProfileInput {
      * SSH is ignored unless Kind is KindSSH.
      */
     "ssh": SSHSettings;
+    "tags": Tag[] | null;
 }
 
 /**
@@ -391,6 +392,15 @@ export interface StartupState {
 }
 
 /**
+ * Tag is a key/value label on a connection. The Name tag is not
+ * stored; it is implied by VPNProfile.Name.
+ */
+export interface Tag {
+    "key": string;
+    "value": string;
+}
+
+/**
  * TunnelInput carries the whole SSH half of a connection: the server it dials
  * and the ports it lends.
  * 
@@ -468,6 +478,11 @@ export interface VPNProfile {
      */
     "ssh": SSHSettings;
     "notes": string;
+
+    /**
+     * Tags are user-defined key/value labels. The Name tag is virtual (profile.Name).
+     */
+    "tags"?: Tag[] | null;
     "createdAt": string;
     "updatedAt": string;
 }

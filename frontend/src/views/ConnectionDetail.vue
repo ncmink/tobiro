@@ -21,6 +21,7 @@ import {
   formatDuration,
   isActive,
 } from '@/lib/state'
+import { displayTags } from '@/lib/tags'
 import { useConnectionsStore } from '@/stores/connections'
 import { useFillShortcutStore } from '@/stores/fillShortcut'
 import { useSessionsStore } from '@/stores/sessions'
@@ -95,6 +96,12 @@ const activeAccount = computed(() => {
 })
 
 const endpoint = computed(() => connection.value?.endpoint ?? '')
+
+const profileTags = computed(() => {
+  const p = connection.value?.profile
+  if (!p) return []
+  return displayTags(p.name, p.tags)
+})
 
 const isSSH = computed(() => connection.value?.profile.kind === 'ssh')
 const forwards = computed(() => session.value?.forwards ?? [])
@@ -457,7 +464,27 @@ onUnmounted(() => {
     </nav>
 
     <section v-show="section === 'overview'" aria-label="Connection overview" class="rounded-2xl border border-line bg-surface-1 p-6">
-      <h2 class="text-base font-semibold text-ink">Current session</h2>
+      <h2 class="text-base font-semibold text-ink">Tags</h2>
+      <table class="mt-3 w-full max-w-lg text-left text-sm">
+        <thead>
+          <tr class="text-xs text-ink-faint">
+            <th class="pb-2 pr-4 font-medium">Key</th>
+            <th class="pb-2 font-medium">Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="tag in profileTags"
+            :key="tag.key"
+            class="border-t border-line"
+          >
+            <td class="py-2 pr-4 font-mono text-xs text-ink-muted">{{ tag.key }}</td>
+            <td class="py-2 font-mono text-xs text-ink break-all">{{ tag.value }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 class="mt-8 text-base font-semibold text-ink">Current session</h2>
       <p v-if="!active" class="mt-2 text-sm text-ink-muted">
         {{ isSSH ? 'Connect to open your saved ports. Live addresses and session details will appear here.' : 'Connect to see your assigned address, account and network status.' }}
       </p>

@@ -16,6 +16,7 @@ import type { ContextMenuItem } from '@/lib/menu'
 import { useConnectionSharing } from '@/lib/connectionSharing'
 import { connectionId, connectionParentId, descendants, findNode, forest } from '@/lib/chain'
 import { accountToConnectWith, canConnect, errorMessage, isActive } from '@/lib/state'
+import { connectionMatchesSearch } from '@/lib/tags'
 import { useConnectionsStore } from '@/stores/connections'
 import { useSessionsStore } from '@/stores/sessions'
 
@@ -54,19 +55,17 @@ const openKubeTarget = ref<main.ConnectionView | null>(null)
 const sshConfigTarget = ref<main.ConnectionView | null>(null)
 
 const filtered = computed(() => {
-  const query = search.value.trim().toLowerCase()
+  const query = search.value.trim()
   const candidates = store.visibleConnections.filter(c =>
     kindFilter.value === 'all' || (c.profile.kind === 'ssh' ? 'ssh' : 'vpn') === kindFilter.value,
   )
   if (!query) return candidates
-  return candidates.filter(
-    (c) =>
-      c.profile.name.toLowerCase().includes(query) ||
-      c.profile.host.toLowerCase().includes(query) ||
-      c.profile.group.toLowerCase().includes(query) ||
-      c.providerName.toLowerCase().includes(query),
-  )
+  return candidates.filter((c) => connectionMatchesSearch(c.profile, c.providerName, query))
 })
+
+function applyTagFilter(query: string) {
+  search.value = query
+}
 
 /**
  * One card per root. Children are nested on that card via `requires`, not
@@ -557,7 +556,7 @@ function requestOpenNative(connection: main.ConnectionView) {
         <input
           v-model="search"
           type="search"
-          placeholder="Search connections…"
+          placeholder="Search or env=prod…"
           aria-label="Search connections"
           class="no-drag min-w-0 w-64 max-w-full rounded-xl border border-line bg-surface-0 py-2.5 pr-3 pl-9 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-brand"
         />
@@ -645,6 +644,7 @@ function requestOpenNative(connection: main.ConnectionView) {
         @disconnect="requestDisconnect"
         @open-native="requestOpenNative"
         @menu="openMenu"
+        @filter-tag="applyTagFilter"
       />
     </div>
 
@@ -692,6 +692,7 @@ function requestOpenNative(connection: main.ConnectionView) {
             @disconnect="requestDisconnect"
             @open-native="requestOpenNative"
             @menu="openMenu"
+            @filter-tag="applyTagFilter"
           />
         </div>
       </section>
