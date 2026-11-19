@@ -216,6 +216,7 @@ Tobiro launches the vendor GUI instead of inventing arguments.
 | Surfshark VPN | yes | macOS | no documented CLI | macOS | open native client |
 | macOS VPN (L2TP/IPsec, IKEv2) | yes | macOS | disconnect only, `scutil --nc` | macOS | open Network settings |
 | OpenVPN Connect | yes | macOS, Windows | no documented connect CLI (`--list-profiles` only) | macOS, Windows | open native client |
+| WireGuard | yes | macOS | yes, `scutil --nc start/stop` (no root) | yes | open WireGuard |
 
 "Pending verification" means a platform CLI was detected (`pulsesvc` /
 `pulselauncher.exe` on Linux and Windows for Ivanti, `fortivpn` on Linux for
@@ -286,19 +287,34 @@ against the machine:
 macOS has no VPN service named "VPN Cat". Configured services: VPN CAT, Sweet Home, VPN.
 ```
 
+### WireGuard on macOS, and why wg-quick is not driven
+
+The official WireGuard app registers each imported tunnel with macOS as a
+NetworkExtension VPN service. macOS exposes those through the same documented
+interface as other VPN types: `scutil --nc list|status|start|stop`. Tobiro uses
+that path so tunnels can be started and stopped **without root** and without
+Tobiro ever reading `.conf` files or private keys — they stay in WireGuard.
+
+[WireGuard's quickstart](https://www.wireguard.com/quickstart/) documents
+`wg` and `wg-quick up|down` against `/etc/wireguard`. Those tools need root (or
+admin on Windows). Tobiro has no privilege-elevation helper yet, so the CLI is
+detected for diagnostics only and is not driven. Linux and Windows builds of
+Tobiro report WireGuard as unsupported until a safe elevation design exists.
+
 ### Connections without a gateway
 
 Most providers are corporate gateways: the user supplies `host:port`, and one
 gateway is reached with a different account per customer. Three are not, and the
 domain says so rather than the UI guessing from a provider key:
 
-- `RequiresEndpoint()` is false for **Tailscale**, **Surfshark** and **macOS
-  VPN**, so the Add Connection form hides the gateway fields and shows the
-  provider's own note.
-- `ManagesOwnAccount()` is true for the same three, so no account list is
-  offered: a Tailscale connection is this machine's node, a Surfshark connection
-  is a subscription kept signed in inside the Surfshark app, and a macOS VPN
-  service keeps its password in the Keychain.
+- `RequiresEndpoint()` is false for **Tailscale**, **Surfshark**, **macOS
+  VPN**, **OpenVPN Connect** and **WireGuard**, so the Add Connection form hides
+  the gateway fields and shows the provider's own note.
+- `ManagesOwnAccount()` is true for the same set, so no account list is offered:
+  a Tailscale connection is this machine's node, a Surfshark connection is a
+  subscription kept signed in inside the Surfshark app, a macOS VPN service keeps
+  its password in the Keychain, OpenVPN Connect keeps credentials per profile, and
+  WireGuard keeps keys inside the WireGuard app.
 - `VendorProfileField()` describes the vendor-side selector a provider connects
   by, so the form can label and require it per provider — "Tunnel name already
   configured in the vendor client" for FortiClient, "macOS VPN service" for

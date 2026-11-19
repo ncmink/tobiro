@@ -43,6 +43,19 @@ func Status(ctx context.Context, id string) (Reading, error) {
 	return ParseStatus(res.Stdout), nil
 }
 
+// OnDemandEnabled reports whether macOS restarts the service whenever traffic
+// matches its On Demand rules. A stop does not stick while this is on.
+func OnDemandEnabled(ctx context.Context, id string) (bool, error) {
+	if err := validate(id); err != nil {
+		return false, err
+	}
+	res, err := sysexec.Run(ctx, scutilPath, "--nc", "show", id)
+	if err != nil && res.Stdout == "" {
+		return false, fmt.Errorf("read macOS VPN configuration: %s", failure(res, err))
+	}
+	return ParseOnDemandEnabled(res.Stdout), nil
+}
+
 // Start asks macOS to bring a service up. It returns as soon as macOS accepts
 // the request — the tunnel comes up asynchronously, so callers poll Status.
 //

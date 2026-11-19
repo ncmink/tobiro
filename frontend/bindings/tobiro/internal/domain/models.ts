@@ -514,6 +514,7 @@ export enum VPNProvider {
     ProviderTailscale = "tailscale",
     ProviderSurfshark = "surfshark",
     ProviderOpenVPN = "openvpn",
+    ProviderWireGuard = "wireguard",
 
     /**
      * ProviderMacOSVPN covers the VPN services configured in macOS System

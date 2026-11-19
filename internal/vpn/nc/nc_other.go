@@ -17,6 +17,8 @@ func List(context.Context) ([]Service, error) { return nil, ErrUnsupported }
 
 func Status(context.Context, string) (Reading, error) { return Reading{}, ErrUnsupported }
 
+func OnDemandEnabled(context.Context, string) (bool, error) { return false, ErrUnsupported }
+
 func Start(context.Context, string) error { return ErrUnsupported }
 
 func Stop(context.Context, string) error { return ErrUnsupported }

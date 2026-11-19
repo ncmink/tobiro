@@ -30,6 +30,7 @@ import (
 	"tobiro/internal/vpn/openvpn"
 	"tobiro/internal/vpn/surfshark"
 	"tobiro/internal/vpn/tailscale"
+	"tobiro/internal/vpn/wireguard"
 )
 
 //go:embed all:frontend/dist
@@ -167,6 +168,7 @@ func buildApp() (*App, error) {
 	registry.Register(surfshark.New())
 	registry.Register(openvpn.New())
 	registry.Register(macosvpn.New())
+	registry.Register(wireguard.New())
 	registerDevelopmentProviders(registry)
 
 	vpnManager := vpn.NewManager(registry, profiles, credentials, sessions, logger)

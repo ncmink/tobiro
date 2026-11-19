@@ -16,6 +16,7 @@ const MARKS: Record<string, { initials: string; classes: string }> = {
   surfshark: { initials: 'SS', classes: 'bg-cyan-500/15 text-cyan-300 ring-cyan-500/30' },
   macosvpn: { initials: 'OS', classes: 'bg-slate-400/15 text-slate-200 ring-slate-400/30' },
   openvpn: { initials: 'OV', classes: 'bg-orange-500/15 text-orange-300 ring-orange-500/30' },
+  wireguard: { initials: 'WG', classes: 'bg-rose-500/15 text-rose-300 ring-rose-500/30' },
   // Not a vendor: an SSH tunnel is this application's own doing.
   ssh: { initials: 'SSH', classes: 'bg-amber-500/15 text-amber-300 ring-amber-500/30' },
 }
@@ -53,4 +54,5 @@ const sizing = computed(() =>
 [data-theme='light'] [data-provider='surfshark'] { color: #0e7490; }
 [data-theme='light'] [data-provider='ssh'] { color: #92400e; }
 [data-theme='light'] [data-provider='openvpn'] { color: #c2410c; }
+[data-theme='light'] [data-provider='wireguard'] { color: #be123c; }
 </style>

@@ -21,7 +21,7 @@ import {
   formatDuration,
   isActive,
 } from '@/lib/state'
-import { displayTags } from '@/lib/tags'
+import { displayTags, normaliseStoredTags } from '@/lib/tags'
 import { useConnectionsStore } from '@/stores/connections'
 import { useFillShortcutStore } from '@/stores/fillShortcut'
 import { useSessionsStore } from '@/stores/sessions'
@@ -102,6 +102,14 @@ const profileTags = computed(() => {
   if (!p) return []
   return displayTags(p.name, p.tags)
 })
+const hasCustomTags = computed(() => {
+  const p = connection.value?.profile
+  return p ? normaliseStoredTags(p.tags).length > 0 : false
+})
+
+function filterDashboardByTag(key: string, value: string) {
+  router.push({ name: 'dashboard', query: { q: `${key}=${value}` } })
+}
 
 const isSSH = computed(() => connection.value?.profile.kind === 'ssh')
 const forwards = computed(() => session.value?.forwards ?? [])
@@ -470,27 +478,7 @@ onUnmounted(() => {
     </nav>
 
     <section v-show="section === 'overview'" aria-label="Connection overview" class="rounded-2xl border border-line bg-surface-1 p-6">
-      <h2 class="text-base font-semibold text-ink">Tags</h2>
-      <table class="mt-3 w-full max-w-lg text-left text-sm">
-        <thead>
-          <tr class="text-xs text-ink-faint">
-            <th class="pb-2 pr-4 font-medium">Key</th>
-            <th class="pb-2 font-medium">Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="tag in profileTags"
-            :key="tag.key"
-            class="border-t border-line"
-          >
-            <td class="py-2 pr-4 font-mono text-xs text-ink-muted">{{ tag.key }}</td>
-            <td class="py-2 font-mono text-xs text-ink break-all">{{ tag.value }}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h2 class="mt-8 text-base font-semibold text-ink">Current session</h2>
+      <h2 class="text-base font-semibold text-ink">Current session</h2>
       <p v-if="!active" class="mt-2 text-sm text-ink-muted">
         {{ isSSH ? 'Connect to open your saved ports. Live addresses and session details will appear here.' : 'Connect to see your assigned address, account and network status.' }}
       </p>
@@ -605,9 +593,36 @@ onUnmounted(() => {
         <p class="mt-1 text-xs leading-relaxed text-ink-muted">{{ diagnosis.detail }}</p>
       </div>
 
+      <div class="mt-6 border-t border-line pt-5">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-sm font-semibold text-ink">Tags</h2>
+          <button
+            type="button"
+            class="no-drag rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-ink-muted transition hover:border-brand/50 hover:text-brand"
+            @click="showEditForm = true"
+          >
+            {{ hasCustomTags ? 'Edit tags' : '+ Add tag' }}
+          </button>
+        </div>
 
-
-
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            v-for="tag in profileTags"
+            :key="tag.key"
+            type="button"
+            class="group no-drag inline-flex max-w-full items-center overflow-hidden rounded-lg border border-line bg-surface-2 text-xs transition hover:border-brand/50"
+            :title="`Filter connections by ${tag.key}=${tag.value}`"
+            @click="filterDashboardByTag(tag.key, tag.value)"
+          >
+            <span class="shrink-0 border-r border-line bg-surface-3 px-2.5 py-1 font-mono text-[11px] font-medium text-ink-muted transition group-hover:text-brand">
+              {{ tag.key }}
+            </span>
+            <span class="max-w-64 truncate px-2.5 py-1 font-medium text-ink">
+              {{ tag.value || '—' }}
+            </span>
+          </button>
+        </div>
+      </div>
     </section>
 
     <!-- Accounts -->

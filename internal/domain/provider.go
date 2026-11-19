@@ -13,6 +13,7 @@ const (
 	ProviderTailscale   VPNProvider = "tailscale"
 	ProviderSurfshark   VPNProvider = "surfshark"
 	ProviderOpenVPN     VPNProvider = "openvpn"
+	ProviderWireGuard   VPNProvider = "wireguard"
 
 	// ProviderMacOSVPN covers the VPN services configured in macOS System
 	// Settings — L2TP over IPsec, IKEv2 and Cisco IPsec. macOS owns these, so
@@ -92,6 +93,7 @@ func SupportedProviders() []ProviderInfo {
 		{ID: ProviderSurfshark, DisplayName: "Surfshark VPN", Vendor: "Surfshark", DefaultPort: 51820},
 		{ID: ProviderMacOSVPN, DisplayName: "macOS VPN (L2TP/IPsec, IKEv2)", Vendor: "Apple", DefaultPort: 500},
 		{ID: ProviderOpenVPN, DisplayName: "OpenVPN Connect", Vendor: "OpenVPN", DefaultPort: 1194},
+		{ID: ProviderWireGuard, DisplayName: "WireGuard", Vendor: "WireGuard", DefaultPort: 51820},
 	}
 	for i := range providers {
 		providers[i].RequiresEndpoint = providers[i].ID.RequiresEndpoint()
@@ -140,7 +142,7 @@ func (p VPNProvider) DisplayName() string {
 // address in System Settings.
 func (p VPNProvider) RequiresEndpoint() bool {
 	switch p {
-	case ProviderTailscale, ProviderSurfshark, ProviderMacOSVPN, ProviderOpenVPN:
+	case ProviderTailscale, ProviderSurfshark, ProviderMacOSVPN, ProviderOpenVPN, ProviderWireGuard:
 		return false
 	default:
 		return true
@@ -157,7 +159,7 @@ func (p VPNProvider) RequiresEndpoint() bool {
 // account per customer, which is why a profile owns a credential list at all.
 func (p VPNProvider) ManagesOwnAccount() bool {
 	switch p {
-	case ProviderTailscale, ProviderSurfshark, ProviderMacOSVPN, ProviderOpenVPN:
+	case ProviderTailscale, ProviderSurfshark, ProviderMacOSVPN, ProviderOpenVPN, ProviderWireGuard:
 		return true
 	default:
 		return false
@@ -176,6 +178,8 @@ func (p VPNProvider) EndpointLabel() string {
 		return "macOS VPN service"
 	case ProviderOpenVPN:
 		return "OpenVPN Connect profile"
+	case ProviderWireGuard:
+		return "WireGuard tunnel"
 	default:
 		return ""
 	}
@@ -201,6 +205,9 @@ func (p VPNProvider) EndpointNote() string {
 	case ProviderOpenVPN:
 		return "Pick a profile already imported into OpenVPN Connect. Tobiro opens the app for you " +
 			"and reports which profile is connected. Username and password stay in OpenVPN Connect."
+	case ProviderWireGuard:
+		return "Pick a tunnel already imported into the WireGuard app. Its peer and keys stay there; " +
+			"Tobiro asks macOS to start and stop the tunnel through scutil --nc."
 	default:
 		return ""
 	}
@@ -236,6 +243,12 @@ func (p VPNProvider) VendorProfileField() VendorProfileField {
 		return VendorProfileField{
 			Label:    "OpenVPN Connect profile",
 			Hint:     "Profile name as shown in OpenVPN Connect. Add one card per profile so Tobiro can tell them apart.",
+			Required: true,
+		}
+	case ProviderWireGuard:
+		return VendorProfileField{
+			Label:    "Tunnel name",
+			Hint:     "Name as shown in the WireGuard app or System Settings › VPN",
 			Required: true,
 		}
 	default:

@@ -215,18 +215,23 @@ function openMenu(event: MouseEvent) {
         <p v-if="jumpHost?.name" class="mt-1 text-xs text-ink-muted">Jump via {{ jumpHost.name }}</p>
         <p v-else-if="showThrough" class="mt-1 text-xs text-ink-muted">Via {{ requires?.name }}</p>
         <p v-else-if="!nested && missingParent" class="mt-1 text-xs text-warn">Parent connection unavailable</p>
-        <div v-if="visibleTagChips.length" class="mt-2 flex flex-wrap items-center gap-1">
+        <div v-if="visibleTagChips.length" class="mt-2 flex flex-wrap items-center gap-1.5">
           <button
             v-for="tag in visibleTagChips"
             :key="tag.key"
             type="button"
-            class="no-drag max-w-full truncate rounded-md border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-ink-muted transition hover:border-brand/40 hover:text-brand"
-            :title="`${tag.key}=${tag.value}`"
+            class="group no-drag inline-flex max-w-full items-center overflow-hidden rounded-md border border-line bg-surface-2 text-[11px] transition hover:border-brand/50"
+            :title="`Filter by ${tag.key}=${tag.value}`"
             @click="filterByTag(tag.key, tag.value)"
           >
-            {{ tag.key }}={{ tag.value }}
+            <span class="shrink-0 border-r border-line bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-medium text-ink-faint transition group-hover:text-brand">
+              {{ tag.key }}
+            </span>
+            <span class="max-w-40 truncate px-1.5 py-0.5 font-medium text-ink-muted transition group-hover:text-ink">
+              {{ tag.value || '—' }}
+            </span>
           </button>
-          <span v-if="extraTagCount" class="text-[10px] text-ink-faint">+{{ extraTagCount }}</span>
+          <span v-if="extraTagCount" class="text-[10px] font-medium text-ink-faint">+{{ extraTagCount }}</span>
         </div>
       </div>
 
@@ -356,6 +361,7 @@ function openMenu(event: MouseEvent) {
           @disconnect="emit('disconnect', $event)"
           @open-native="emit('openNative', $event)"
           @menu="(c, event) => emit('menu', c, event)"
+          @filter-tag="emit('filterTag', $event)"
         />
       </div>
     </section>

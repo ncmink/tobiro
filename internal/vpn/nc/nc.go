@@ -163,6 +163,18 @@ func ParseStatus(raw string) Reading {
 	return reading
 }
 
+// ParseOnDemandEnabled reads `OnDemandEnabled : TRUE|FALSE` from
+// `scutil --nc show <service>`.
+func ParseOnDemandEnabled(raw string) bool {
+	for _, line := range strings.Split(raw, "\n") {
+		if value, found := strings.CutPrefix(strings.TrimSpace(line), "OnDemandEnabled : "); found {
+			value = strings.TrimSpace(value)
+			return strings.EqualFold(value, "TRUE") || value == "1"
+		}
+	}
+	return false
+}
+
 // FindByName resolves a service by its System Settings name, case-insensitively
 // so a slightly differently typed name still matches.
 func FindByName(services []Service, name string) (Service, bool) {

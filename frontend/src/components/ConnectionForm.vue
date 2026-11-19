@@ -123,7 +123,7 @@ const checksForcepointStatus = computed(() => form.provider === 'forcepoint')
 const profileLabel = computed(() => vendorProfileField.value?.label ?? 'Vendor profile')
 
 /** Adapters that implement VendorProfileLister on this platform. */
-const vendorProfileListerProviders = new Set(['macosvpn', 'tailscale', 'ivanti', 'openvpn'])
+const vendorProfileListerProviders = new Set(['macosvpn', 'tailscale', 'ivanti', 'openvpn', 'wireguard'])
 
 /**
  * What the provider already has configured on this machine.
@@ -157,7 +157,9 @@ watch(
           ? 'Could not load Ivanti connections. Enter the connection name shown in Ivanti Secure Access.'
           : provider === 'openvpn'
             ? 'Could not load OpenVPN Connect profiles. Enter the profile name shown in OpenVPN Connect.'
-            : 'Could not load saved VPN connections. Enter the name shown in System Settings.'
+            : provider === 'wireguard'
+              ? 'Could not load WireGuard tunnels. Enter the tunnel name shown in the WireGuard app.'
+              : 'Could not load saved VPN connections. Enter the name shown in System Settings.'
     try {
       const options = await Promise.race([
         ListVendorProfiles(provider),
@@ -176,7 +178,9 @@ watch(
               ? 'Could not load Ivanti connections. You can enter the connection name below.'
               : provider === 'openvpn'
                 ? 'Could not load OpenVPN Connect profiles. You can enter the profile name below.'
-                : 'Could not load saved VPN connections. You can enter the name below.',
+                : provider === 'wireguard'
+                  ? 'Could not load WireGuard tunnels. You can enter the tunnel name below.'
+                  : 'Could not load saved VPN connections. You can enter the name below.',
         )
       }
     } finally {
@@ -390,7 +394,13 @@ defineExpose({
         </label>
 
         <p v-if="discovering" role="status" class="text-xs text-ink-muted">
-          {{ form.provider === 'tailscale' ? 'Looking for Tailscale accounts on this machine…' : 'Looking for saved VPN connections…' }}
+          {{
+            form.provider === 'tailscale'
+              ? 'Looking for Tailscale accounts on this machine…'
+              : form.provider === 'wireguard'
+                ? 'Looking for WireGuard tunnels on this machine…'
+                : 'Looking for saved VPN connections…'
+          }}
           You can enter the name below.
         </p>
 
@@ -445,6 +455,12 @@ defineExpose({
           class="mt-1.5 text-xs leading-relaxed text-ink-muted"
         >
           No Tailscale accounts were found. Open Tailscale, sign in or join the tailnet, then try again.
+        </p>
+        <p
+          v-else-if="form.provider === 'wireguard' && !discovering && !discovered.length"
+          class="mt-1.5 text-xs leading-relaxed text-ink-muted"
+        >
+          No WireGuard tunnels were found. Import a tunnel in the WireGuard app first, then try again.
         </p>
       </div>
 

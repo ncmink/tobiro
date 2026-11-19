@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import type { domain, main } from '@/lib/bindings'
 import logo from '@/assets/images/app-logo.png'
@@ -20,12 +20,19 @@ import { connectionMatchesSearch } from '@/lib/tags'
 import { useConnectionsStore } from '@/stores/connections'
 import { useSessionsStore } from '@/stores/sessions'
 
+const route = useRoute()
 const router = useRouter()
 const store = useConnectionsStore()
 const sessions = useSessionsStore()
 const { sharing, exportConnections, importConnections } = useConnectionSharing()
 
-const search = ref('')
+const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
+watch(
+  () => route.query.q,
+  (q) => {
+    if (typeof q === 'string') search.value = q
+  },
+)
 const kindFilter = ref<'all' | 'vpn' | 'ssh'>('all')
 const filterOptions = computed(() => [
   { id: 'all' as const, label: 'All connections', count: store.visibleConnections.length },
@@ -35,6 +42,9 @@ const filterOptions = computed(() => [
 function clearFilters() {
   search.value = ''
   kindFilter.value = 'all'
+  if (route.query.q !== undefined) {
+    router.replace({ name: 'dashboard', query: {} })
+  }
 }
 /** Which kind the add form is filling in, or null while it is closed. */
 const addKind = ref<string | null>(null)
