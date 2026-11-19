@@ -88,7 +88,7 @@ func ParseSSHCommand(raw string) (SSHCommand, error) {
 		case 'D':
 			return SSHCommand{}, errors.New("dynamic SOCKS forwards (-D) are not supported yet")
 		case 'J':
-			return SSHCommand{}, errors.New("jump hosts (-J) are not supported yet")
+			return SSHCommand{}, errors.New("jump hosts (-J) are not supported in paste — set “Connect through jump host” on the tunnel instead")
 		case 'p':
 			parsed, err := strconv.Atoi(value)
 			if err != nil {

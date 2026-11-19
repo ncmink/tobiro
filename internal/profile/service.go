@@ -110,6 +110,7 @@ func (s *Service) Create(in domain.ProfileInput) (domain.VPNProfile, error) {
 		Provider:      in.Provider,
 		Group:         domain.NormaliseGroup(in.Group),
 		Requires:      in.Requires,
+		JumpHost:      in.JumpHost,
 		Host:          in.Host,
 		Port:          in.Port,
 		VendorProfile: in.VendorProfile,
@@ -126,7 +127,7 @@ func (s *Service) Create(in domain.ProfileInput) (domain.VPNProfile, error) {
 		if taken := nameTaken(d.Profiles, p.Name, ""); taken {
 			return fmt.Errorf("a connection called %q already exists", p.Name)
 		}
-		if err := checkRequirement(d, p.ID, p.Requires); err != nil {
+		if err := checkReferences(d, p.ID, p.Requires, p.JumpHost); err != nil {
 			return err
 		}
 		d.Profiles = append(d.Profiles, p)
@@ -162,34 +163,76 @@ func foldName(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
-// checkRequirement validates a prerequisite reference inside a transaction.
-//
-// A connection may only need one that exists, is not itself, and does not
-// already depend on it. The last case is what stops a pair from waiting on each
-// other: bringing either one up would otherwise recurse until something gave.
-func checkRequirement(d *store.Data, id, requires string) error {
-	if requires == "" {
+func checkReferences(d *store.Data, id, requires, jumpHost string) error {
+	self := findProfile(d, id)
+	if err := checkReference(d, id, requires, false, self); err != nil {
+		return err
+	}
+	return checkReference(d, id, jumpHost, true, self)
+}
+
+func checkReference(d *store.Data, id, targetID string, jump bool, self *domain.VPNProfile) error {
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
 		return nil
 	}
-	if requires == id {
+	if targetID == id {
+		if jump {
+			return errors.New("a connection cannot use itself as a jump host")
+		}
 		return errors.New("a connection cannot need itself")
 	}
 
-	target := findProfile(d, requires)
+	target := findProfile(d, targetID)
 	if target == nil {
+		if jump {
+			return fmt.Errorf("the jump host: %w", domain.ErrNotFound)
+		}
 		return fmt.Errorf("the connection this one needs first: %w", domain.ErrNotFound)
 	}
 
-	// Walk the chain above the target. Arriving back at this profile means the
-	// two would need each other, directly or through however many hops.
-	step := target
-	for hops := 0; step != nil && step.Requires != "" && hops <= len(d.Profiles); hops++ {
-		if step.Requires == id {
-			return fmt.Errorf("%q already needs this connection, so they cannot need each other", target.Name)
+	if jump {
+		if self != nil && !self.IsSSH() {
+			return errors.New("only an SSH tunnel can use a jump host")
 		}
-		step = findProfile(d, step.Requires)
+		if !target.IsSSH() {
+			return errors.New("a jump host must be an SSH tunnel")
+		}
+	}
+
+	if referencesReach(d, targetID, id) {
+		if jump {
+			return fmt.Errorf("%q already depends on this connection, so it cannot be a jump host", target.Name)
+		}
+		return fmt.Errorf("%q already needs this connection, so they cannot need each other", target.Name)
 	}
 	return nil
+}
+
+func referencesReach(d *store.Data, start, goal string) bool {
+	visited := map[string]bool{}
+	var walk func(string) bool
+	walk = func(cur string) bool {
+		if cur == goal {
+			return true
+		}
+		if visited[cur] {
+			return false
+		}
+		visited[cur] = true
+		p := findProfile(d, cur)
+		if p == nil {
+			return false
+		}
+		if p.Requires != "" && walk(p.Requires) {
+			return true
+		}
+		if p.JumpHost != "" && walk(p.JumpHost) {
+			return true
+		}
+		return false
+	}
+	return walk(start)
 }
 
 func findProfile(d *store.Data, id string) *domain.VPNProfile {
@@ -217,7 +260,7 @@ func (s *Service) Update(id string, in domain.ProfileInput) (domain.VPNProfile, 
 			if nameTaken(d.Profiles, in.Name, id) {
 				return fmt.Errorf("a connection called %q already exists", in.Name)
 			}
-			if err := checkRequirement(d, id, in.Requires); err != nil {
+			if err := checkReferences(d, id, in.Requires, in.JumpHost); err != nil {
 				return err
 			}
 			changingKind := d.Profiles[i].AccessKind() != in.Kind
@@ -227,6 +270,7 @@ func (s *Service) Update(id string, in domain.ProfileInput) (domain.VPNProfile, 
 			d.Profiles[i].Provider = in.Provider
 			d.Profiles[i].Group = domain.NormaliseGroup(in.Group)
 			d.Profiles[i].Requires = in.Requires
+			d.Profiles[i].JumpHost = in.JumpHost
 			d.Profiles[i].VendorProfile = in.VendorProfile
 			d.Profiles[i].ClientPath = in.ClientPath
 			d.Profiles[i].Notes = in.Notes
@@ -274,7 +318,7 @@ func (s *Service) Delete(id string) error {
 			if d.Profiles[i].ID == id {
 				d.Profiles = append(d.Profiles[:i], d.Profiles[i+1:]...)
 				delete(d.Preferences, id)
-				releaseRequirement(d, id)
+				releaseReferences(d, id)
 				pruneGroups(d)
 				return nil
 			}
@@ -283,10 +327,18 @@ func (s *Service) Delete(id string) error {
 	})
 }
 
-func releaseRequirement(d *store.Data, id string) {
+func releaseReferences(d *store.Data, id string) {
 	for i := range d.Profiles {
+		changed := false
 		if d.Profiles[i].Requires == id {
 			d.Profiles[i].Requires = ""
+			changed = true
+		}
+		if d.Profiles[i].JumpHost == id {
+			d.Profiles[i].JumpHost = ""
+			changed = true
+		}
+		if changed {
 			d.Profiles[i].UpdatedAt = time.Now()
 		}
 	}
@@ -303,7 +355,7 @@ func (s *Service) Dependents(id string) []domain.VPNProfile {
 	var out []domain.VPNProfile
 	s.store.Read(func(d *store.Data) {
 		for _, p := range d.Profiles {
-			if p.Requires == id {
+			if p.Requires == id || p.JumpHost == id {
 				out = append(out, p)
 			}
 		}
@@ -465,10 +517,36 @@ func (s *Service) SetRequirement(id, requires string) (domain.VPNProfile, error)
 			if d.Profiles[i].ID != id {
 				continue
 			}
-			if err := checkRequirement(d, id, requires); err != nil {
+			if err := checkReferences(d, id, requires, d.Profiles[i].JumpHost); err != nil {
 				return err
 			}
 			d.Profiles[i].Requires = requires
+			d.Profiles[i].UpdatedAt = time.Now()
+			updated = d.Profiles[i]
+			return nil
+		}
+		return fmt.Errorf("profile %s: %w", id, domain.ErrNotFound)
+	})
+	if err != nil {
+		return domain.VPNProfile{}, err
+	}
+	return updated, nil
+}
+
+// SetJumpHost records the SSH tunnel to reach through, or clears it.
+func (s *Service) SetJumpHost(id, jumpHost string) (domain.VPNProfile, error) {
+	jumpHost = strings.TrimSpace(jumpHost)
+
+	var updated domain.VPNProfile
+	err := s.store.Update(func(d *store.Data) error {
+		for i := range d.Profiles {
+			if d.Profiles[i].ID != id {
+				continue
+			}
+			if err := checkReferences(d, id, d.Profiles[i].Requires, jumpHost); err != nil {
+				return err
+			}
+			d.Profiles[i].JumpHost = jumpHost
 			d.Profiles[i].UpdatedAt = time.Now()
 			updated = d.Profiles[i]
 			return nil

@@ -33,6 +33,39 @@ Host moi-st-4
     ServerAliveInterval 60
 `
 
+func TestProxyJumpIsParsed(t *testing.T) {
+	raw := []byte(`
+Host inner
+    HostName 10.0.0.2
+    User inner
+    ProxyJump bastion,relay
+
+Host bastion
+    HostName 10.0.0.1
+    User bastion
+    ProxyCommand ssh -W %h:%p elsewhere
+`)
+	got := Parse(raw)
+	if len(got) != 2 {
+		t.Fatalf("hosts = %d", len(got))
+	}
+	var inner, bastion Host
+	for _, h := range got {
+		switch h.Alias {
+		case "inner":
+			inner = h
+		case "bastion":
+			bastion = h
+		}
+	}
+	if len(inner.ProxyJump) != 2 || inner.ProxyJump[0] != "bastion" || inner.ProxyJump[1] != "relay" {
+		t.Fatalf("ProxyJump = %+v", inner.ProxyJump)
+	}
+	if len(bastion.Unsupported) != 1 || bastion.Unsupported[0] != "ProxyCommand" {
+		t.Fatalf("unsupported = %+v", bastion.Unsupported)
+	}
+}
+
 func TestParseSampleMOIHosts(t *testing.T) {
 	got := Parse([]byte(sampleConfig))
 	if len(got) != 5 {

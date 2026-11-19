@@ -15,7 +15,7 @@ export function isDashboardVisible(
   if (showHidden) return true
   if (connection.hidden) return false
 
-  let parentId = (connection.profile.requires || '').trim()
+  let parentId = (connection.profile.jumpHost || connection.profile.requires || '').trim()
   const seen = new Set<string>()
   while (parentId) {
     if (seen.has(parentId)) break
@@ -23,7 +23,7 @@ export function isDashboardVisible(
     const parent = byId.get(parentId)
     if (!parent) break
     if (parent.hidden) return false
-    parentId = (parent.profile.requires || '').trim()
+    parentId = (parent.profile.jumpHost || parent.profile.requires || '').trim()
   }
   return true
 }

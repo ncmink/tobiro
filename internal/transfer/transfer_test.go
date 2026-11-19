@@ -63,8 +63,8 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if doc.Version != Version {
-		t.Errorf("version = %d, want %d", doc.Version, Version)
+	if doc.Version != 2 {
+		t.Errorf("version = %d, want 2 without jump hosts", doc.Version)
 	}
 	if len(doc.Connections) != 2 {
 		t.Fatalf("connections = %d, want 2", len(doc.Connections))

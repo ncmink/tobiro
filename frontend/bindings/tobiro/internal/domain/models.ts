@@ -287,6 +287,7 @@ export interface ProfileInput {
      * questions only the profile service can answer.
      */
     "requires": string;
+    "jumpHost": string;
 
     /**
      * SSH is ignored unless Kind is KindSSH.
@@ -376,6 +377,7 @@ export interface SessionView {
     "identity": string;
     "forwards": PortForward[] | null;
     "error": string;
+    "detail": string;
     "durationSeconds": number;
 }
 
@@ -451,6 +453,13 @@ export interface VPNProfile {
      * and read a dial timeout when they get it wrong.
      */
     "requires"?: string;
+
+    /**
+     * JumpHost is the SSH tunnel this connection reaches through. Empty means
+     * a direct TCP dial. It is independent of Requires, which only orders
+     * lifecycle.
+     */
+    "jumpHost"?: string;
     "host": string;
     "port": number;
 

@@ -384,8 +384,19 @@ func (m *Manager) refreshTailscaleStatuses(ctx context.Context, profiles []domai
 	tailscale.ReconcileProfiles(ctx, ts, profiles, m.sessions, m.applyVPNStatus)
 }
 
-// RefreshAll probes every stored profile. The Go-side watcher calls this so
-// status does not depend on the webview's timer staying awake.
+// CanDisconnect reports whether this profile can be torn down programmatically.
+func (m *Manager) CanDisconnect(ctx context.Context, profile domain.VPNProfile) bool {
+	if profile.IsSSH() {
+		return true
+	}
+	adapter, err := m.registry.Get(profile.Provider)
+	if err != nil {
+		return false
+	}
+	caps, _, err := m.capabilities(ctx, adapter)
+	return err == nil && caps.CanDisconnect
+}
+
 func (m *Manager) RefreshAll(ctx context.Context) {
 	all := m.profiles.List()
 	var tailscaleProfiles, ivantiProfiles []domain.VPNProfile

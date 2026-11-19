@@ -97,6 +97,10 @@ type VPNSession struct {
 	Forwards []PortForward `json:"forwards,omitempty"`
 
 	Error string `json:"error"`
+
+	// Detail is a short runtime note for reconnects (for example waiting on
+	// another connection). It is not persisted.
+	Detail string `json:"detail"`
 }
 
 // DurationSeconds reports how long the tunnel has been up, or 0 if it never
@@ -137,6 +141,7 @@ type SessionView struct {
 	Identity   string        `json:"identity"`
 	Forwards   []PortForward `json:"forwards"`
 	Error      string        `json:"error"`
+	Detail     string        `json:"detail"`
 
 	DurationSeconds int `json:"durationSeconds"`
 }
@@ -156,6 +161,7 @@ func (s VPNSession) View() SessionView {
 		Identity:        s.Identity,
 		Forwards:        s.Forwards,
 		Error:           s.Error,
+		Detail:          s.Detail,
 		DurationSeconds: s.DurationSeconds(),
 	}
 }

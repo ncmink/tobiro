@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -46,6 +47,8 @@ func (b *uiBridge) requestConnect(profileID string) {
 }
 
 const nativeFillCountdownSeconds = 5
+
+const hostKeyPromptTimeout = 2 * time.Minute
 
 func (b *uiBridge) RequestOTP(ctx context.Context, req domain.InteractionRequest) (string, error) {
 	requestID, answers, release := b.await()
@@ -96,7 +99,10 @@ func (b *uiBridge) ConfirmHostKey(ctx context.Context, req domain.HostKeyRequest
 		KnownHosts:  req.KnownHosts,
 	})
 
-	if _, err := wait(ctx, answers); err != nil {
+	promptCtx, cancel := context.WithTimeout(ctx, hostKeyPromptTimeout)
+	defer cancel()
+
+	if _, err := wait(promptCtx, answers); err != nil {
 		if errors.Is(err, domain.ErrInteractionCancelled) {
 			return false, nil
 		}

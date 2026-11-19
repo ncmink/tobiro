@@ -47,10 +47,11 @@ func (c credentials) Resolve(id string) (domain.Credential, error) {
 
 // prompter records what the UI was asked and answers with a fixed decision.
 type prompter struct {
-	accept  bool
-	asked   chan domain.HostKeyRequest
-	events  chan string
-	failure chan domain.ConnectionFailedEvent
+	accept       bool
+	confirmDelay time.Duration
+	asked        chan domain.HostKeyRequest
+	events       chan string
+	failure      chan domain.ConnectionFailedEvent
 }
 
 func newPrompter(accept bool) *prompter {
@@ -63,6 +64,9 @@ func newPrompter(accept bool) *prompter {
 }
 
 func (p *prompter) ConfirmHostKey(_ context.Context, req domain.HostKeyRequest) (bool, error) {
+	if p.confirmDelay > 0 {
+		time.Sleep(p.confirmDelay)
+	}
 	p.asked <- req
 	return p.accept, nil
 }
@@ -574,6 +578,227 @@ func quicken(t *testing.T) {
 
 // A VPN profile reaching this manager is a routing bug, and it must not be
 // answered with a half-attempted SSH connection.
+// A server that accepts TCP and then says nothing mimics a wedged handshake.
+// Disconnect must cancel the attempt without leaving listeners or a connected session.
+// The handshake timer must not fire while the user is reading a host-key prompt.
+func TestAHostKeyPromptLongerThanTheHandshakeBudgetStillSucceeds(t *testing.T) {
+	prev := handshakeTimeout
+	handshakeTimeout = 80 * time.Millisecond
+	t.Cleanup(func() { handshakeTimeout = prev })
+
+	r := newRig(t)
+	r.prompter.accept = true
+	r.prompter.confirmDelay = 200 * time.Millisecond
+
+	if _, err := r.manager.Connect(context.Background(), "p1", "c1"); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+}
+
+func TestASilentServerEventuallyTimesOutTheHandshake(t *testing.T) {
+	prev := handshakeTimeout
+	handshakeTimeout = 80 * time.Millisecond
+	t.Cleanup(func() { handshakeTimeout = prev })
+
+	r := newRig(t)
+	r.trustTheServer(t)
+
+	hold, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = hold.Close() })
+	go func() {
+		for {
+			conn, err := hold.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn // never speaks SSH
+		}
+	}()
+	addr := hold.Addr().(*net.TCPAddr)
+	r.profiles.profile.Host = addr.IP.String()
+	r.profiles.profile.Port = addr.Port
+
+	_, err = r.manager.Connect(context.Background(), "p1", "c1")
+	if err == nil {
+		t.Fatal("expected handshake timeout")
+	}
+}
+
+func TestDisconnectDuringConnectCancelsTheAttempt(t *testing.T) {
+	r := newRig(t)
+	r.trustTheServer(t)
+
+	hold, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = hold.Close() })
+	go func() {
+		for {
+			conn, err := hold.Accept()
+			if err != nil {
+				return
+			}
+			// Hold the connection open without speaking SSH.
+			go func(c net.Conn) {
+				<-t.Context().Done()
+				_ = c.Close()
+			}(conn)
+		}
+	}()
+	addr := hold.Addr().(*net.TCPAddr)
+	r.profiles.profile.Host = addr.IP.String()
+	r.profiles.profile.Port = addr.Port
+
+	done := make(chan struct{})
+	var connectErr error
+	go func() {
+		_, connectErr = r.manager.Connect(context.Background(), "p1", "c1")
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	if _, err := r.manager.Disconnect(context.Background(), "p1"); err != nil {
+		t.Fatalf("disconnect: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("connect did not return after disconnect")
+	}
+	if connectErr == nil {
+		t.Fatal("expected connect to be cancelled")
+	}
+
+	current, ok := r.sessions.Get("p1")
+	if !ok || current.State != domain.StateDisconnected {
+		t.Fatalf("session = %+v, want disconnected", current)
+	}
+
+	local := net.JoinHostPort("127.0.0.1", strconv.Itoa(r.localPort()))
+	if _, err := net.DialTimeout("tcp", local, 200*time.Millisecond); err == nil {
+		t.Error("a cancelled connect left the forward port listening")
+	}
+	r.manager.mu.Lock()
+	_, held := r.manager.tunnels["p1"]
+	r.manager.mu.Unlock()
+	if held {
+		t.Fatal("a cancelled connect left a tunnel in the map")
+	}
+}
+
+type routeCreds map[string]domain.Credential
+
+func (r routeCreds) Resolve(id string) (domain.Credential, error) {
+	c, ok := r[id]
+	if !ok {
+		return domain.Credential{}, os.ErrNotExist
+	}
+	return c, nil
+}
+
+type mapProfiles struct {
+	all map[string]domain.VPNProfile
+}
+
+func (m *mapProfiles) Get(id string) (domain.VPNProfile, error) {
+	p, ok := m.all[id]
+	if !ok {
+		return domain.VPNProfile{}, os.ErrNotExist
+	}
+	return p, nil
+}
+
+func (m *mapProfiles) List() []domain.VPNProfile {
+	out := make([]domain.VPNProfile, 0, len(m.all))
+	for _, p := range m.all {
+		out = append(out, p)
+	}
+	return out
+}
+
+func (m *mapProfiles) RememberCredential(_, _ string) error { return nil }
+
+func TestConnectThroughProxyJump(t *testing.T) {
+	jumpSrv, err := sshtest.Start()
+	if err != nil {
+		t.Fatalf("jump server: %v", err)
+	}
+	t.Cleanup(func() { _ = jumpSrv.Close() })
+	targetSrv, err := sshtest.Start()
+	if err != nil {
+		t.Fatalf("target server: %v", err)
+	}
+	t.Cleanup(func() { _ = targetSrv.Close() })
+
+	backend := echo(t)
+	remotePort := backend.Addr().(*net.TCPAddr).Port
+	localPort := freePort(t)
+
+	jumpProfile := domain.VPNProfile{
+		ID: "jump", Name: "jump", Kind: domain.KindSSH, Provider: domain.ProviderSSH,
+		Host: jumpSrv.Host(), Port: jumpSrv.Port(),
+		SSH: domain.SSHSettings{
+			User: "jumpuser",
+			Forwards: []domain.PortForward{
+				{Name: "placeholder", LocalPort: freePort(t), RemoteHost: "127.0.0.1", RemotePort: 22},
+			},
+		},
+	}
+	targetProfile := domain.VPNProfile{
+		ID: "target", Name: "target", Kind: domain.KindSSH, Provider: domain.ProviderSSH,
+		JumpHost: "jump",
+		Host:     targetSrv.Host(),
+		Port:     targetSrv.Port(),
+		SSH: domain.SSHSettings{
+			User: "targetuser",
+			Forwards: []domain.PortForward{
+				{Name: "echo", LocalPort: localPort, RemoteHost: "127.0.0.1", RemotePort: remotePort},
+			},
+		},
+	}
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SSH_AUTH_SOCK", "")
+	dir := filepath.Join(home, ".ssh")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	known := jumpSrv.KnownHostsLine() + targetSrv.KnownHostsLine()
+	if err := os.WriteFile(filepath.Join(dir, "known_hosts"), []byte(known), 0o600); err != nil {
+		t.Fatalf("known_hosts: %v", err)
+	}
+
+	store := &mapProfiles{all: map[string]domain.VPNProfile{"jump": jumpProfile, "target": targetProfile}}
+	creds := routeCreds{
+		"cj": {ID: "cj", ProfileID: "jump", Username: "jumpuser", AuthMethod: domain.AuthPassword, Secret: "hunter2"},
+		"ct": {ID: "ct", ProfileID: "target", Username: "targetuser", AuthMethod: domain.AuthPassword, Secret: "hunter2"},
+	}
+	sessions := session.NewManager()
+	manager := NewManager(store, creds, sessions, testLogger())
+	manager.SetPrompter(newPrompter(true))
+	t.Cleanup(manager.Shutdown)
+
+	before := jumpSrv.ForwardCount()
+	if _, err := manager.Connect(context.Background(), "jump", "cj"); err != nil {
+		t.Fatalf("connect jump: %v", err)
+	}
+	if _, err := manager.Connect(context.Background(), "target", "ct"); err != nil {
+		t.Fatalf("connect target: %v", err)
+	}
+	if jumpSrv.ForwardCount() <= before {
+		t.Fatalf("expected the jump host to open a forwarded channel, before=%d after=%d", before, jumpSrv.ForwardCount())
+	}
+	if got := speak(t, net.JoinHostPort("127.0.0.1", strconv.Itoa(localPort)), "hop\n"); got != "hop\n" {
+		t.Fatalf("read %q through proxied tunnel", got)
+	}
+}
+
 func TestAVPNProfileIsRefused(t *testing.T) {
 	r := newRig(t)
 	r.profiles.profile.Kind = domain.KindVPN

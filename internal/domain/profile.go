@@ -49,6 +49,11 @@ type VPNProfile struct {
 	// and read a dial timeout when they get it wrong.
 	Requires string `json:"requires,omitempty"`
 
+	// JumpHost is the SSH tunnel this connection reaches through. Empty means
+	// a direct TCP dial. It is independent of Requires, which only orders
+	// lifecycle.
+	JumpHost string `json:"jumpHost,omitempty"`
+
 	Host string `json:"host"`
 	Port int    `json:"port"`
 
@@ -82,6 +87,18 @@ func (p VPNProfile) AccessKind() AccessKind { return p.Kind.Normalise() }
 
 // IsSSH reports whether this profile is an SSH tunnel.
 func (p VPNProfile) IsSSH() bool { return p.AccessKind() == KindSSH }
+
+// Prerequisites lists connections that must be up before this one, in order.
+func (p VPNProfile) Prerequisites() []string {
+	var out []string
+	if id := strings.TrimSpace(p.Requires); id != "" {
+		out = append(out, id)
+	}
+	if id := strings.TrimSpace(p.JumpHost); id != "" && id != strings.TrimSpace(p.Requires) {
+		out = append(out, id)
+	}
+	return out
+}
 
 // ReadyToConnect reports what is still missing before this connection can be
 // raised, or nil when nothing is.
@@ -142,6 +159,7 @@ type ProfileInput struct {
 	// Whether it exists, and whether pointing at it would form a loop, are
 	// questions only the profile service can answer.
 	Requires string `json:"requires"`
+	JumpHost string `json:"jumpHost"`
 
 	// SSH is ignored unless Kind is KindSSH.
 	SSH SSHSettings `json:"ssh"`
@@ -157,6 +175,7 @@ func (in ProfileInput) Normalise() ProfileInput {
 	in.VendorProfile = strings.TrimSpace(in.VendorProfile)
 	in.ClientPath = strings.TrimSpace(in.ClientPath)
 	in.Requires = strings.TrimSpace(in.Requires)
+	in.JumpHost = strings.TrimSpace(in.JumpHost)
 	in.Kind = in.Kind.Normalise()
 
 	if in.Kind == KindSSH {

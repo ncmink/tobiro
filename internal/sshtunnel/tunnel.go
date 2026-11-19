@@ -43,11 +43,16 @@ type stateSink func(state domain.ConnectionState, detail string)
 // ports stay bound and the supervisor redials underneath them, so a client
 // holding the endpoint — kubectl, Biebie Kube, a browser — sees a connection
 // refused for a few seconds instead of losing the address entirely.
+type dialConnFunc func(ctx context.Context) (net.Conn, string, error)
+
 type tunnel struct {
 	profile domain.VPNProfile
 	config  *ssh.ClientConfig
 	log     *logging.Logger
 	onState stateSink
+
+	dialConn dialConnFunc
+	gate     *prerequisiteGate
 
 	mu         sync.Mutex
 	client     *ssh.Client
@@ -63,16 +68,18 @@ type tunnel struct {
 // The first dial is synchronous on purpose: a bad password or an unaccepted
 // host key is the user's own next action, and reporting it as a failed connect
 // is far more useful than a connection that claims to be coming up forever.
-func open(ctx context.Context, profile domain.VPNProfile, config *ssh.ClientConfig, log *logging.Logger, onState stateSink) (*tunnel, error) {
+func open(ctx context.Context, profile domain.VPNProfile, config *ssh.ClientConfig, log *logging.Logger, onState stateSink, hostKey *verifier, dialConn dialConnFunc, gate *prerequisiteGate) (*tunnel, error) {
 	t := &tunnel{
-		profile: profile,
-		config:  config,
-		log:     log,
-		onState: onState,
-		done:    make(chan struct{}),
+		profile:  profile,
+		config:   config,
+		log:      log,
+		onState:  onState,
+		dialConn: dialConn,
+		gate:     gate,
+		done:     make(chan struct{}),
 	}
 
-	client, err := t.dial(ctx)
+	client, err := t.dial(ctx, hostKey)
 	if err != nil {
 		return nil, err
 	}
@@ -97,30 +104,54 @@ func open(ctx context.Context, profile domain.VPNProfile, config *ssh.ClientConf
 	return t, nil
 }
 
-func (t *tunnel) dial(ctx context.Context) (*ssh.Client, error) {
-	address := t.profile.Endpoint()
+func (t *tunnel) dial(ctx context.Context, hostKey *verifier) (*ssh.Client, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if t.gate != nil {
+		block, detail := t.gate.evaluate()
+		if detail != "" {
+			t.onState(domain.StateConnecting, detail)
+		}
+		if block {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, failf(FailUnreachable, "%s", detail)
+		}
+	}
 
-	dialer := net.Dialer{Timeout: t.config.Timeout}
-	conn, err := dialer.DialContext(ctx, "tcp", address)
+	conn, address, err := t.dialConn(ctx)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, failf(FailUnreachable, "reach %s: %w", address, err)
 	}
 
-	// The handshake gets the same deadline as the dial. Without it, a host that
-	// accepts TCP and then says nothing holds the attempt open indefinitely.
-	if t.config.Timeout > 0 {
-		_ = conn.SetDeadline(time.Now().Add(t.config.Timeout))
+	// Closing the TCP conn is the only way to abort an in-flight handshake when
+	// the user disconnects mid-connect.
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
+
+	var guard handshakeGuard
+	if hostKey != nil {
+		hostKey.SetHandshakeGuard(&guard)
 	}
+	guard.bind(conn)
+	defer guard.stop()
+
 	sshConn, channels, requests, err := ssh.NewClientConn(conn, address, t.config)
 	if err != nil {
 		_ = conn.Close()
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		if KindOf(err) != "" {
 			return nil, err
 		}
 		return nil, fail(FailAuth, fmt.Errorf("authenticate to %s: %w", address, err))
 	}
-	_ = conn.SetDeadline(time.Time{})
-
 	return ssh.NewClient(sshConn, channels, requests), nil
 }
 
@@ -210,7 +241,18 @@ func (t *tunnel) repair(ctx context.Context) bool {
 
 	delay := redialMin
 	for {
-		client, err := t.dial(ctx)
+		if block, detail := t.waitForPrerequisites(ctx); block {
+			if detail != "" {
+				t.onState(domain.StateConnecting, detail)
+			}
+			select {
+			case <-ctx.Done():
+				return false
+			case <-time.After(2 * time.Second):
+				continue
+			}
+		}
+		client, err := t.dial(ctx, nil)
 		if err == nil {
 			t.mu.Lock()
 			if t.closed {
@@ -279,6 +321,26 @@ func (t *tunnel) forwards() []domain.PortForward {
 }
 
 // close releases the local ports and the connection. It is safe to call twice.
+func (t *tunnel) waitForPrerequisites(ctx context.Context) (block bool, detail string) {
+	if t.gate == nil {
+		return false, ""
+	}
+	for {
+		block, detail = t.gate.evaluate()
+		if detail != "" {
+			t.onState(domain.StateConnecting, detail)
+		}
+		if !block {
+			return false, detail
+		}
+		select {
+		case <-ctx.Done():
+			return true, detail
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
 func (t *tunnel) close() {
 	t.mu.Lock()
 	if t.closed {

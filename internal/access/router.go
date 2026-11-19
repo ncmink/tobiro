@@ -21,6 +21,7 @@ package access
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"tobiro/internal/domain"
@@ -62,6 +63,11 @@ type CredentialChooser interface {
 	SelectDefault(profileID, lastUsedID string) string
 }
 
+// DisconnectPolicy reports whether a profile can be torn down programmatically.
+type DisconnectPolicy interface {
+	CanDisconnect(ctx context.Context, profile domain.VPNProfile) bool
+}
+
 // Router dispatches on a profile's access kind and honours the order a
 // connection has to be reached in.
 type Router struct {
@@ -70,11 +76,26 @@ type Router struct {
 	credentials CredentialChooser
 	vpn         Connector
 	ssh         Connector
+
+	mu      sync.Mutex
+	flights map[string]*connectFlight
+}
+
+type connectFlight struct {
+	done chan struct{}
+	err  error
 }
 
 // NewRouter wires the router to both mechanisms.
 func NewRouter(profiles ProfileReader, states StateReader, credentials CredentialChooser, vpn, ssh Connector) *Router {
-	return &Router{profiles: profiles, states: states, credentials: credentials, vpn: vpn, ssh: ssh}
+	return &Router{
+		profiles:    profiles,
+		states:      states,
+		credentials: credentials,
+		vpn:         vpn,
+		ssh:         ssh,
+		flights:     make(map[string]*connectFlight),
+	}
 }
 
 // Connect brings a connection up through whichever mechanism owns it, after
@@ -97,38 +118,89 @@ func (r *Router) Connect(ctx context.Context, profileID, credentialID string) (d
 // already connected is left alone: it may well be carrying somebody else's
 // work.
 func (r *Router) raise(ctx context.Context, profile domain.VPNProfile, depth int) error {
-	if profile.Requires == "" {
-		return nil
-	}
 	if depth >= maxChain {
 		return fmt.Errorf("%q sits behind too many connections to bring up (more than %d)", profile.Name, maxChain)
 	}
 
-	needed, err := r.profiles.Get(profile.Requires)
-	if err != nil {
-		return fmt.Errorf("%q needs a connection that is no longer here; edit it and choose another", profile.Name)
-	}
+	for _, ref := range profile.Prerequisites() {
+		needed, err := r.profiles.Get(ref)
+		if err != nil {
+			return fmt.Errorf("%q needs a connection that is no longer here; edit it and choose another", profile.Name)
+		}
 
-	switch state := r.states.State(needed.ID); {
-	case state == domain.StateConnected:
-		return nil
-	case state.IsActive():
-		// Something else is already bringing it up, and joining that attempt
-		// from here would mean two sessions for one profile. Waiting is the
-		// user's call to make, and a moment later the retry succeeds.
-		return fmt.Errorf("%q is still coming up, and %q needs it first — try again once it is connected",
-			needed.Name, profile.Name)
-	}
+		switch state := r.states.State(needed.ID); {
+		case state == domain.StateConnected:
+			continue
+		case state.IsActive():
+			if r.waitFlight(ctx, needed.ID) {
+				if r.states.State(needed.ID) == domain.StateConnected {
+					continue
+				}
+			}
+			return fmt.Errorf("%q is still coming up, and %q needs it first — try again once it is connected",
+				needed.Name, profile.Name)
+		}
 
-	if err := r.raise(ctx, needed, depth+1); err != nil {
-		return err
-	}
-
-	credentialID := r.credentials.SelectDefault(needed.ID, r.profiles.Preferences(needed.ID).LastCredentialID)
-	if _, err := r.connectorFor(needed).Connect(ctx, needed.ID, credentialID); err != nil {
-		return fmt.Errorf("%q needs %q first, and that could not be brought up: %w", profile.Name, needed.Name, err)
+		if err := r.raise(ctx, needed, depth+1); err != nil {
+			return err
+		}
+		if err := r.ensureConnected(ctx, needed, profile.Name); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func (r *Router) ensureConnected(ctx context.Context, needed domain.VPNProfile, childName string) error {
+	if r.states.State(needed.ID) == domain.StateConnected {
+		return nil
+	}
+
+	r.mu.Lock()
+	if existing, ok := r.flights[needed.ID]; ok {
+		r.mu.Unlock()
+		select {
+		case <-existing.done:
+			return existing.err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	flight := &connectFlight{done: make(chan struct{})}
+	r.flights[needed.ID] = flight
+	r.mu.Unlock()
+
+	credentialID := r.credentials.SelectDefault(needed.ID, r.profiles.Preferences(needed.ID).LastCredentialID)
+	var err error
+	if _, connectErr := r.connectorFor(needed).Connect(ctx, needed.ID, credentialID); connectErr != nil {
+		err = fmt.Errorf("%q needs %q first, and that could not be brought up: %w", childName, needed.Name, connectErr)
+	} else {
+		err = nil
+	}
+
+	flight.err = err
+	close(flight.done)
+
+	r.mu.Lock()
+	delete(r.flights, needed.ID)
+	r.mu.Unlock()
+	return err
+}
+
+func (r *Router) waitFlight(ctx context.Context, profileID string) bool {
+	r.mu.Lock()
+	flight, ok := r.flights[profileID]
+	r.mu.Unlock()
+	if !ok {
+		return false
+	}
+	select {
+	case <-flight.done:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // Disconnect tears one down, and with it anything that was only reachable
@@ -143,23 +215,34 @@ func (r *Router) Disconnect(ctx context.Context, profileID string) (domain.VPNSe
 	if err != nil {
 		return domain.VPNSession{}, err
 	}
-	r.drop(ctx, profile, 0)
-	return r.connectorFor(profile).Disconnect(ctx, profileID)
+	connector := r.connectorFor(profile)
+	if policy, ok := connector.(DisconnectPolicy); ok && !policy.CanDisconnect(ctx, profile) {
+		return domain.VPNSession{}, &domain.UnsupportedOperationError{
+			Provider:  profile.Provider,
+			Operation: "disconnect",
+			Reason:    "this connection cannot be disconnected from here",
+		}
+	}
+	r.drop(ctx, profile, 0, map[string]bool{})
+	return connector.Disconnect(ctx, profileID)
 }
 
-func (r *Router) drop(ctx context.Context, profile domain.VPNProfile, depth int) {
+func (r *Router) drop(ctx context.Context, profile domain.VPNProfile, depth int, visited map[string]bool) {
 	if depth >= maxChain {
 		return
 	}
+	if visited[profile.ID] {
+		return
+	}
+	visited[profile.ID] = true
 	for _, dependent := range r.profiles.Dependents(profile.ID) {
-		if !r.states.State(dependent.ID).IsActive() {
-			continue
+		r.drop(ctx, dependent, depth+1, visited)
+		if r.states.State(dependent.ID).IsActive() {
+			// A dependent that will not close is reported by its own manager and
+			// logged there. The connection the user actually asked to drop still
+			// comes down.
+			_, _ = r.connectorFor(dependent).Disconnect(ctx, dependent.ID)
 		}
-		r.drop(ctx, dependent, depth+1)
-		// A dependent that will not close is reported by its own manager and
-		// logged there. The connection the user actually asked to drop still
-		// comes down.
-		_, _ = r.connectorFor(dependent).Disconnect(ctx, dependent.ID)
 	}
 }
 

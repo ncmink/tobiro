@@ -12,7 +12,7 @@ import DisconnectChainDialog from '@/components/DisconnectChainDialog.vue'
 import ForwardList from '@/components/ForwardList.vue'
 import ProviderIcon from '@/components/ProviderIcon.vue'
 import TunnelSettings from '@/components/TunnelSettings.vue'
-import { connectionId, connectionParentId, descendants, findNode, forest } from '@/lib/chain'
+import { connectionId, connectionTreeParentId, descendants, findNode, forest } from '@/lib/chain'
 import {
   accountToConnectWith,
   canConnect,
@@ -108,6 +108,12 @@ const forwards = computed(() => session.value?.forwards ?? [])
 
 /** The connection this one is reached through, with its live state. */
 const requires = computed(() => connection.value?.requires ?? null)
+const jumpHost = computed(() => connection.value?.jumpHost ?? null)
+const jumpHostState = computed(() => {
+  const hop = jumpHost.value
+  if (!hop) return 'disconnected'
+  return sessions.sessionFor(hop.profileId)?.state ?? hop.state ?? 'disconnected'
+})
 const requiresState = computed(() => {
   const needed = requires.value
   if (!needed) return 'disconnected'
@@ -116,7 +122,7 @@ const requiresState = computed(() => {
 
 const activeDependents = computed(() => {
   const node = findNode(
-    forest(store.connections, connectionId, connectionParentId),
+    forest(store.connections, connectionId, connectionTreeParentId),
     props.id,
     connectionId,
   )
@@ -488,6 +494,7 @@ onUnmounted(() => {
       <p v-if="!active" class="mt-2 text-sm text-ink-muted">
         {{ isSSH ? 'Connect to open your saved ports. Live addresses and session details will appear here.' : 'Connect to see your assigned address, account and network status.' }}
       </p>
+      <p v-else-if="session?.detail" class="mt-2 text-sm text-ink-muted">{{ session.detail }}</p>
       <p v-else-if="state !== 'connected'" class="mt-2 text-sm text-ink-muted">The connection is updating. Its status is shown above.</p>
       <!-- The order this connection has to be reached in. It is shown whatever
            the state, because it is the answer to "why did Connect start
@@ -510,6 +517,25 @@ onUnmounted(() => {
           </p>
         </div>
         <ConnectionStatus :state="requiresState" />
+      </div>
+
+      <div
+        v-if="jumpHost"
+        class="mt-5 flex items-start gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3"
+      >
+        <div class="min-w-0 flex-1">
+          <p class="text-xs text-ink-faint">Jump host</p>
+          <RouterLink
+            :to="{ name: 'connection', params: { id: jumpHost.profileId } }"
+            class="no-drag text-sm font-medium text-ink underline-offset-2 transition hover:text-brand hover:underline"
+          >
+            {{ jumpHost.name }}
+          </RouterLink>
+          <p class="mt-1 text-xs leading-relaxed text-ink-muted">
+            SSH traffic to this server is opened through {{ jumpHost.name }}&apos;s live session.
+          </p>
+        </div>
+        <ConnectionStatus :state="jumpHostState" />
       </div>
 
       <dl v-if="state === 'connected'" class="mt-6 grid gap-4 border-t border-line pt-5 sm:grid-cols-4">

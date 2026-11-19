@@ -26,7 +26,7 @@ import (
 )
 
 // appVersion is stamped into the Settings screen and release checks.
-const appVersion = "0.0.11"
+const appVersion = "0.1.0"
 
 // statusWatchInterval is how often connection status is re-read in the
 // background, so a dead tunnel shows as disconnected within a few seconds.
@@ -485,7 +485,8 @@ func (a *App) buildConnectionView(p domain.VPNProfile) ConnectionView {
 		Hidden:            a.profiles.GroupHidden(p.Group),
 	}
 	view.SuggestedCredentialID = a.credentials.SelectDefault(p.ID, prefs.LastCredentialID)
-	view.Requires = a.requirementOf(p)
+	view.Requires = a.requirementOf(p.Requires)
+	view.JumpHost = a.requirementOf(p.JumpHost)
 
 	if s, ok := a.sessions.Get(p.ID); ok {
 		sv := s.View()
@@ -510,11 +511,11 @@ func (a *App) buildConnectionView(p domain.VPNProfile) ConnectionView {
 // error: the profile service clears these on delete, so the only way to see one
 // is a hand-edited file, and a missing name is not worth breaking the dashboard
 // over. The Connect attempt still says what is wrong.
-func (a *App) requirementOf(p domain.VPNProfile) *RequirementView {
-	if p.Requires == "" {
+func (a *App) requirementOf(profileID string) *RequirementView {
+	if profileID == "" {
 		return nil
 	}
-	needed, err := a.profiles.Get(p.Requires)
+	needed, err := a.profiles.Get(profileID)
 	if err != nil {
 		return nil
 	}

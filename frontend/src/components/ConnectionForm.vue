@@ -39,6 +39,7 @@ const form = reactive({
   kind: props.connection?.profile.kind || props.kind || 'vpn',
   group: props.connection?.profile.group ?? '',
   requires: props.connection?.profile.requires ?? '',
+  jumpHost: props.connection?.profile.jumpHost ?? '',
   provider: props.connection?.profile.provider ?? props.providers[0]?.id ?? 'forcepoint',
   host: props.connection?.profile.host ?? '',
   port: props.connection?.profile.port ?? 443,
@@ -71,14 +72,20 @@ const requirementOptions = computed(() => {
   for (let pass = 0; pass < all.length; pass++) {
     const before = waiting.size
     for (const candidate of all) {
-      if (candidate.profile.requires && waiting.has(candidate.profile.requires)) {
-        waiting.add(candidate.profile.id)
+      for (const ref of [candidate.profile.requires, candidate.profile.jumpHost]) {
+        if (ref && waiting.has(ref)) {
+          waiting.add(candidate.profile.id)
+        }
       }
     }
     if (waiting.size === before) break
   }
   return all.filter((c) => !waiting.has(c.profile.id))
 })
+
+const jumpHostOptions = computed(() =>
+  requirementOptions.value.filter((c) => c.profile.kind === 'ssh'),
+)
 
 // Offer the vendor's usual port when the provider changes on a new connection.
 watch(
@@ -237,6 +244,7 @@ function submitSSH() {
     kind: 'ssh',
     group: form.group.trim(),
     requires: form.requires,
+    jumpHost: form.jumpHost,
     provider: 'ssh',
     host: '',
     port: 0,
@@ -307,6 +315,22 @@ defineExpose({
         </AppSelect>
         <p class="mt-1.5 text-xs leading-relaxed text-ink-muted">
           Choose a connection that must be available first. Disconnecting it also closes dependent connections.
+        </p>
+      </div>
+
+      <div v-if="isSSH && jumpHostOptions.length">
+        <label class="mb-1.5 block text-sm font-medium text-ink" for="conn-jump">
+          Connect through jump host <span class="font-normal text-ink-faint">(optional)</span>
+        </label>
+        <AppSelect id="conn-jump" v-model="form.jumpHost">
+          <option value="">Direct TCP connection</option>
+          <option v-for="option in jumpHostOptions" :key="option.profile.id" :value="option.profile.id">
+            {{ option.profile.name }}
+          </option>
+        </AppSelect>
+        <p class="mt-1.5 text-xs leading-relaxed text-ink-muted">
+          SSH traffic is carried through the jump host&apos;s live session. You can still name a VPN or other
+          prerequisite above when the route must be up first.
         </p>
       </div>
 

@@ -20,6 +20,8 @@ type Host struct {
 	Port         int
 	IdentityFile string
 	Forwards     []domain.PortForward
+	ProxyJump    []string
+	Unsupported  []string
 }
 
 type block struct {
@@ -29,6 +31,8 @@ type block struct {
 	port         int
 	identityFile string
 	forwards     []domain.PortForward
+	proxyJump    []string
+	unsupported  []string
 }
 
 // Parse reads OpenSSH config text into discrete Host entries.
@@ -96,6 +100,22 @@ func Parse(raw []byte) []Host {
 					cur.forwards = append(cur.forwards, f)
 				}
 			}
+		case "proxyjump":
+			if cur != nil {
+				cur.proxyJump = parseProxyJump(value)
+			}
+		case "proxycommand":
+			if cur != nil {
+				cur.unsupported = append(cur.unsupported, "ProxyCommand")
+			}
+		case "remoteforward":
+			if cur != nil {
+				cur.unsupported = append(cur.unsupported, "RemoteForward")
+			}
+		case "dynamicforward":
+			if cur != nil {
+				cur.unsupported = append(cur.unsupported, "DynamicForward")
+			}
 		}
 	}
 	emit(cur)
@@ -133,7 +153,26 @@ func finalize(alias string, b block) Host {
 		Port:         port,
 		IdentityFile: strings.TrimSpace(b.identityFile),
 		Forwards:     forwards,
+		ProxyJump:    append([]string(nil), b.proxyJump...),
+		Unsupported:  append([]string(nil), b.unsupported...),
 	}
+}
+
+func parseProxyJump(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, "none") {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" || strings.EqualFold(part, "none") {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
 }
 
 func stripComment(line string) string {

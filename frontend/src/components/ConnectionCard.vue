@@ -60,6 +60,7 @@ const forwards = computed(() => session.value?.forwards ?? [])
  * does not make the tunnel look independent.
  */
 const requires = computed(() => props.connection.requires ?? null)
+const jumpHost = computed(() => props.connection.jumpHost ?? null)
 const missingParent = computed(() => props.node?.missingParent === true)
 const showThrough = computed(() => !props.nested && missingParent.value && Boolean(requires.value?.name))
 
@@ -211,7 +212,8 @@ function openMenu(event: MouseEvent) {
         <p v-if="node?.cyclic" class="mt-1 text-xs text-warn">
           Dependency cycle — shown as a standalone connection.
         </p>
-        <p v-if="showThrough" class="mt-1 text-xs text-ink-muted">Via {{ requires?.name }}</p>
+        <p v-if="jumpHost?.name" class="mt-1 text-xs text-ink-muted">Jump via {{ jumpHost.name }}</p>
+        <p v-else-if="showThrough" class="mt-1 text-xs text-ink-muted">Via {{ requires?.name }}</p>
         <p v-else-if="!nested && missingParent" class="mt-1 text-xs text-warn">Parent connection unavailable</p>
         <div v-if="visibleTagChips.length" class="mt-2 flex flex-wrap items-center gap-1">
           <button

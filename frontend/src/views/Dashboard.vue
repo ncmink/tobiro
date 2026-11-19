@@ -14,7 +14,7 @@ import OpenKubeDialog from '@/components/OpenKubeDialog.vue'
 import SshConfigImportDialog from '@/components/SshConfigImportDialog.vue'
 import type { ContextMenuItem } from '@/lib/menu'
 import { useConnectionSharing } from '@/lib/connectionSharing'
-import { connectionId, connectionParentId, descendants, findNode, forest } from '@/lib/chain'
+import { connectionId, connectionTreeParentId, descendants, findNode, forest } from '@/lib/chain'
 import { accountToConnectWith, canConnect, errorMessage, isActive } from '@/lib/state'
 import { connectionMatchesSearch } from '@/lib/tags'
 import { useConnectionsStore } from '@/stores/connections'
@@ -71,15 +71,18 @@ function applyTagFilter(query: string) {
  * One card per root. Children are nested on that card via `requires`, not
  * listed again as siblings.
  */
-const trees = computed(() => forest(filtered.value, connectionId, connectionParentId))
+const trees = computed(() => forest(filtered.value, connectionId, connectionTreeParentId))
 
 /** Whole catalogue, so a disconnect confirm names hidden dependents too. */
 const catalogueForest = computed(() =>
-  forest(store.connections, connectionId, connectionParentId),
+  forest(store.connections, connectionId, connectionTreeParentId),
 )
 
 function dependentsOf(connection: main.ConnectionView) {
-  return store.connections.filter((c) => c.profile.requires === connection.profile.id)
+  const id = connection.profile.id
+  return store.connections.filter(
+    (c) => c.profile.requires === id || c.profile.jumpHost === id,
+  )
 }
 
 function isLive(connection: main.ConnectionView) {

@@ -26,6 +26,23 @@ export function connectionParentId(item: { profile: { requires?: string } }): st
   return (item.profile.requires || '').trim()
 }
 
+/** Parent used for dashboard nesting: jump host wins over requires. */
+export function connectionTreeParentId(item: { profile: { requires?: string; jumpHost?: string } }): string {
+  const jump = (item.profile.jumpHost || '').trim()
+  if (jump) return jump
+  return connectionParentId(item)
+}
+
+/** Both reference edges, for cycle detection. */
+export function connectionReferenceIds(item: { profile: { requires?: string; jumpHost?: string } }): string[] {
+  const out: string[] = []
+  const requires = (item.profile.requires || '').trim()
+  const jump = (item.profile.jumpHost || '').trim()
+  if (requires) out.push(requires)
+  if (jump && jump !== requires) out.push(jump)
+  return out
+}
+
 /**
  * Groups items into a forest using an explicit parent identifier.
  *

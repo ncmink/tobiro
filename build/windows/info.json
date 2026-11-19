@@ -1,10 +1,10 @@
 {
 	"fixed": {
-		"file_version": "0.0.11"
+		"file_version": "0.1.0"
 	},
 	"info": {
 		"0000": {
-			"ProductVersion": "0.0.11",
+			"ProductVersion": "0.1.0",
 			"CompanyName": "Tobiro",
 			"FileDescription": "Desktop access manager for DevOps engineers.",
 			"LegalCopyright": "© 2026, Tobiro",

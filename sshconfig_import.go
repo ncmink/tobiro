@@ -112,13 +112,45 @@ func (a *App) ImportSSHConfigHosts(parentID string, aliases []string) (ImportRes
 			result.Skipped = append(result.Skipped, name)
 			continue
 		}
+		if len(h.Unsupported) > 0 {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("%q uses %s, which Tobiro cannot import", name, strings.Join(h.Unsupported, ", ")))
+		}
+
+		requires := parent.ID
+		jumpHost := ""
+		for i, hopAlias := range h.ProxyJump {
+			hopKey := strings.ToLower(strings.TrimSpace(hopAlias))
+			hop, ok := byAlias[hopKey]
+			if !ok {
+				result.Warnings = append(result.Warnings,
+					fmt.Sprintf("%q lists ProxyJump %q, which is not in the SSH config", name, hopAlias))
+				continue
+			}
+			hopID, err := a.ensureSSHConfigHost(hop, parent, byName, &result)
+			if err != nil {
+				result.Warnings = append(result.Warnings, err.Error())
+				continue
+			}
+			if i == 0 {
+				if _, err := a.profiles.SetRequirement(hopID, parent.ID); err != nil {
+					result.Warnings = append(result.Warnings,
+						fmt.Sprintf("could not attach %q to %q: %v", hop.Alias, parent.Name, err))
+				}
+			}
+			jumpHost = hopID
+		}
+		if len(h.ProxyJump) > 0 {
+			requires = ""
+		}
 
 		created, err := a.profiles.Create(domain.ProfileInput{
 			Name:     name,
 			Kind:     domain.KindSSH,
 			Provider: domain.ProviderSSH,
 			Group:    parent.Group,
-			Requires: parent.ID,
+			Requires: requires,
+			JumpHost: jumpHost,
 		})
 		if err != nil {
 			return result, fmt.Errorf("could not import %q: %w", name, err)
@@ -166,4 +198,42 @@ func (a *App) ImportSSHConfigHosts(parentID string, aliases []string) (ImportRes
 	a.log.Info("Imported %d SSH tunnels from %s through %q (%d skipped as already present)",
 		result.Connections, path, parent.Name, len(result.Skipped))
 	return result, nil
+}
+
+func (a *App) ensureSSHConfigHost(h sshconfig.Host, parent domain.VPNProfile, byName map[string]string, result *ImportResultView) (string, error) {
+	key := strings.ToLower(strings.TrimSpace(h.Alias))
+	if id, ok := byName[key]; ok {
+		return id, nil
+	}
+	name := strings.TrimSpace(h.Alias)
+	if name == "" {
+		return "", fmt.Errorf("a ProxyJump host block has no name")
+	}
+
+	created, err := a.profiles.Create(domain.ProfileInput{
+		Name:     name,
+		Kind:     domain.KindSSH,
+		Provider: domain.ProviderSSH,
+		Group:    parent.Group,
+		Requires: parent.ID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("could not import jump host %q: %w", name, err)
+	}
+	_, err = a.profiles.SetTunnel(created.ID, domain.TunnelInput{
+		Host: h.HostName,
+		Port: h.Port,
+		SSH: domain.SSHSettings{
+			User:     h.User,
+			Forwards: append([]domain.PortForward(nil), h.Forwards...),
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("could not configure jump host %q: %w", name, err)
+	}
+
+	byName[key] = created.ID
+	result.Connections++
+	result.Warnings = append(result.Warnings, fmt.Sprintf("added jump host %q from ProxyJump", name))
+	return created.ID, nil
 }

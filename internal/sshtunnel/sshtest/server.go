@@ -16,6 +16,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -34,8 +35,9 @@ type Server struct {
 	mu   sync.Mutex
 	live map[net.Conn]struct{}
 
-	closeOnce sync.Once
-	done      chan struct{}
+	closeOnce    sync.Once
+	done         chan struct{}
+	forwardCount atomic.Int64
 }
 
 // Option configures a server before it starts.
@@ -109,6 +111,9 @@ func (s *Server) KnownHostsLine() string {
 // Fingerprint is what a host key prompt would show.
 func (s *Server) Fingerprint() string { return ssh.FingerprintSHA256(s.hostKey) }
 
+// ForwardCount reports how many direct-tcpip channels the server accepted.
+func (s *Server) ForwardCount() int64 { return s.forwardCount.Load() }
+
 // Drop severs every connection the server is holding while staying open for
 // new ones. That is what a laptop waking from sleep finds: the old connection
 // is gone, and the server it was to is perfectly fine.
@@ -169,7 +174,8 @@ func (s *Server) serve(conn net.Conn) {
 			_ = channel.Reject(ssh.UnknownChannelType, "only port forwarding is served here")
 			continue
 		}
-		go s.forward(channel)
+		s.forwardCount.Add(1)
+	go s.forward(channel)
 	}
 }
 

@@ -68,6 +68,11 @@ export interface ConnectionView {
     "requires": RequirementView | null;
 
     /**
+     * JumpHost names the SSH tunnel this connection reaches through, if any.
+     */
+    "jumpHost": RequirementView | null;
+
+    /**
      * SuggestedCredentialID is what the connect dialog should preselect: the
      * last account used on this profile, else the default, else the only one.
      */
@@ -115,6 +120,7 @@ export interface ImportResultView {
     "connections": number;
     "accounts": number;
     "skipped": string[] | null;
+    "warnings": string[] | null;
     "cancelled": boolean;
 }
 

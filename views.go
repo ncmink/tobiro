@@ -36,6 +36,9 @@ type ConnectionView struct {
 	// every screen that mentions it wants the name and the live state.
 	Requires *RequirementView `json:"requires"`
 
+	// JumpHost names the SSH tunnel this connection reaches through, if any.
+	JumpHost *RequirementView `json:"jumpHost"`
+
 	// SuggestedCredentialID is what the connect dialog should preselect: the
 	// last account used on this profile, else the default, else the only one.
 	SuggestedCredentialID string `json:"suggestedCredentialId"`
@@ -203,6 +206,7 @@ type ImportResultView struct {
 	Connections int      `json:"connections"`
 	Accounts    int      `json:"accounts"`
 	Skipped     []string `json:"skipped"`
+	Warnings    []string `json:"warnings"`
 	Cancelled   bool     `json:"cancelled"`
 }
 

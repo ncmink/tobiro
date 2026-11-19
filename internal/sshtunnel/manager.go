@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
+
+	"golang.org/x/crypto/ssh"
 
 	"tobiro/internal/domain"
 	"tobiro/internal/logging"
@@ -52,8 +55,10 @@ type Manager struct {
 	// accepted in a terminal is not asked about again here.
 	knownHosts string
 
-	mu      sync.Mutex
-	tunnels map[string]*tunnel
+	mu         sync.Mutex
+	tunnels    map[string]*tunnel
+	inflight   map[string]context.CancelFunc
+	connectGen map[string]uint64
 }
 
 // NewManager wires the manager.
@@ -64,6 +69,8 @@ func NewManager(profiles ProfileReader, credentials CredentialResolver, sessions
 		sessions:    sessions,
 		log:         log,
 		tunnels:     make(map[string]*tunnel),
+		inflight:    make(map[string]context.CancelFunc),
+		connectGen:  make(map[string]uint64),
 	}
 }
 
@@ -72,6 +79,9 @@ func (m *Manager) SetPrompter(p Prompter) { m.prompter = p }
 
 // SetKnownHosts points host key verification at a file other than the user's.
 func (m *Manager) SetKnownHosts(path string) { m.knownHosts = path }
+
+// CanDisconnect reports whether this profile can be torn down programmatically.
+func (m *Manager) CanDisconnect(context.Context, domain.VPNProfile) bool { return true }
 
 // Connect raises the tunnel for a profile using one credential UUID.
 func (m *Manager) Connect(ctx context.Context, profileID, credentialID string) (domain.VPNSession, error) {
@@ -105,6 +115,9 @@ func (m *Manager) Connect(ctx context.Context, profileID, credentialID string) (
 	}
 	_ = sess
 
+	connectCtx, gen, endConnect := m.beginConnect(profileID, ctx)
+	defer endConnect()
+
 	// The passphrase or password is registered with the logger for the length
 	// of this call, so no error text built from it can reach the activity log.
 	release := m.log.Protect(credential.Secret)
@@ -113,16 +126,25 @@ func (m *Manager) Connect(ctx context.Context, profileID, credentialID string) (
 	m.log.Info("Opening SSH tunnel profile=%s endpoint=%s credential=%s",
 		profile.Name, profile.EndpointDisplay(), defaultString(credential.ID, "ssh-agent"))
 
-	config, err := clientConfig(profile, credential,
-		newVerifier(ctx, profileID, m.knownHosts, m.prompter, m.log).callback)
+	verifier := newVerifier(connectCtx, profileID, m.knownHosts, m.prompter, m.log)
+	config, err := clientConfig(profile, credential, verifier.callback)
 	if err != nil {
 		return m.fail(profile, err), err
 	}
 
-	t, err := open(ctx, profile, config, m.log, m.sink(profileID))
+	gate := newPrerequisiteGate(profile, m.profiles, m.sessions)
+	t, err := open(connectCtx, profile, config, m.log, m.sink(profileID), verifier, m.dialConn(profile), gate)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || connectCtx.Err() != nil {
+			return m.cancelled(profileID), fmt.Errorf("the connection attempt was cancelled")
+		}
 		err = advise(profile, err)
 		return m.fail(profile, err), err
+	}
+
+	if !m.connectStillCurrent(profileID, gen) {
+		t.close()
+		return m.cancelled(profileID), fmt.Errorf("the connection attempt was cancelled")
 	}
 
 	m.mu.Lock()
@@ -169,6 +191,11 @@ func (m *Manager) Disconnect(ctx context.Context, profileID string) (domain.VPNS
 	}
 
 	m.mu.Lock()
+	if cancel, ok := m.inflight[profileID]; ok {
+		cancel()
+		delete(m.inflight, profileID)
+	}
+	m.connectGen[profileID]++
 	t, ok := m.tunnels[profileID]
 	delete(m.tunnels, profileID)
 	m.mu.Unlock()
@@ -185,6 +212,7 @@ func (m *Manager) Disconnect(ctx context.Context, profileID string) (domain.VPNS
 		s.Interface = ""
 		s.Identity = ""
 		s.Forwards = nil
+		s.Detail = ""
 	})
 	if err != nil {
 		final = domain.VPNSession{ProfileID: profileID, State: domain.StateDisconnected}
@@ -249,11 +277,50 @@ func (m *Manager) Shutdown() {
 }
 
 // sink applies the transitions a supervising tunnel drives.
+func (m *Manager) dialConn(profile domain.VPNProfile) dialConnFunc {
+	address := profile.Endpoint()
+	return func(ctx context.Context) (net.Conn, string, error) {
+		if profile.JumpHost == "" {
+			dialer := net.Dialer{Timeout: dialTimeout}
+			conn, err := dialer.DialContext(ctx, "tcp", address)
+			return conn, address, err
+		}
+		client, err := m.jumpClient(profile.JumpHost)
+		if err != nil {
+			return nil, address, err
+		}
+		conn, err := client.DialContext(ctx, "tcp", address)
+		return conn, address, err
+	}
+}
+
+func (m *Manager) jumpClient(jumpID string) (*ssh.Client, error) {
+	m.mu.Lock()
+	t, ok := m.tunnels[jumpID]
+	m.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("jump host %q is not connected", jumpID)
+	}
+	t.mu.Lock()
+	client := t.client
+	t.mu.Unlock()
+	if client == nil {
+		return nil, fmt.Errorf("jump host %q is reconnecting", jumpID)
+	}
+	return client, nil
+}
+
 func (m *Manager) sink(profileID string) stateSink {
 	return func(state domain.ConnectionState, detail string) {
 		_, err := m.sessions.TransitionWith(profileID, state, func(s *domain.VPNSession) {
 			if state == domain.StateConnecting {
 				s.Error = ""
+				if strings.HasPrefix(detail, "Waiting for") {
+					s.Detail = detail
+				}
+			}
+			if state == domain.StateConnected {
+				s.Detail = ""
 			}
 		})
 		if err != nil {
@@ -264,6 +331,53 @@ func (m *Manager) sink(profileID string) stateSink {
 			m.log.Info("profile=%s tunnel %s", profileID, detail)
 		}
 	}
+}
+
+func (m *Manager) beginConnect(profileID string, parent context.Context) (context.Context, uint64, func()) {
+	connectCtx, cancel := context.WithCancel(parent)
+	m.mu.Lock()
+	if previous, ok := m.inflight[profileID]; ok {
+		previous()
+	}
+	m.connectGen[profileID]++
+	gen := m.connectGen[profileID]
+	m.inflight[profileID] = cancel
+	m.mu.Unlock()
+
+	return connectCtx, gen, func() {
+		cancel()
+		m.mu.Lock()
+		if m.connectGen[profileID] == gen {
+			delete(m.inflight, profileID)
+		}
+		m.mu.Unlock()
+	}
+}
+
+func (m *Manager) connectStillCurrent(profileID string, gen uint64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.connectGen[profileID] == gen
+}
+
+func (m *Manager) cancelled(profileID string) domain.VPNSession {
+	current, ok := m.sessions.Get(profileID)
+	if ok && current.State == domain.StateDisconnected {
+		return current
+	}
+	if ok && current.State.IsActive() {
+		final, err := m.sessions.TransitionWith(profileID, domain.StateDisconnected, func(s *domain.VPNSession) {
+			s.AssignedIP = ""
+			s.Interface = ""
+			s.Identity = ""
+			s.Forwards = nil
+			s.Error = ""
+		})
+		if err == nil {
+			return final
+		}
+	}
+	return domain.VPNSession{ProfileID: profileID, State: domain.StateDisconnected}
 }
 
 func (m *Manager) fail(profile domain.VPNProfile, cause error) domain.VPNSession {
@@ -286,7 +400,7 @@ func (m *Manager) fail(profile domain.VPNProfile, cause error) domain.VPNSession
 // records what it sits behind is left alone: the router brought that up first,
 // so the address really is unreachable and a hint would only mislead.
 func advise(profile domain.VPNProfile, cause error) error {
-	if profile.Requires != "" || !dialFailed(cause) {
+	if profile.Requires != "" || profile.JumpHost != "" || !dialFailed(cause) {
 		return cause
 	}
 	return fmt.Errorf(`%w — if %s is only reachable from inside the customer's network, connect their `+

@@ -77,7 +77,7 @@ func statusFor(profileID string, profile domain.VPNProfile, session domain.VPNSe
 	case bctx.AccessFailed:
 		status.Detail = redact(defaultDetail(session.Error, "The last attempt to connect failed."))
 	case bctx.AccessConnecting:
-		status.Detail = "Tobiro is still bringing this connection up."
+		status.Detail = defaultDetail(session.Detail, "Tobiro is still bringing this connection up.")
 	case bctx.AccessDisconnected:
 		status.Detail = "This connection is not up in Tobiro."
 	}

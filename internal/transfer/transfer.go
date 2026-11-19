@@ -19,9 +19,9 @@ import (
 
 // Version is the schema version written into every export.
 //
-// Version 2 added SSH tunnels. A version 1 file still imports: it simply has no
-// kind, which reads as VPN.
-const Version = 2
+// Version 2 added SSH tunnels. Version 3 adds jumpHost.
+// A version 1 file still imports: it simply has no kind, which reads as VPN.
+const Version = 3
 
 // header explains the file to whoever opens it in an editor.
 const header = `# Tobiro — connections
@@ -56,6 +56,7 @@ type Connection struct {
 	// identifier, because the recipient's copy of it has an identifier of its
 	// own. Names are unique here, which is what makes that unambiguous.
 	Requires string `yaml:"requires,omitempty"`
+	JumpHost string `yaml:"jumpHost,omitempty"`
 
 	Notes    string    `yaml:"notes,omitempty"`
 	Accounts []Account `yaml:"accounts,omitempty"`
@@ -84,7 +85,7 @@ type Account struct {
 // Build assembles a document from profiles and their accounts.
 func Build(profiles []domain.VPNProfile, accountsOf func(profileID string) []domain.CredentialView) Document {
 	doc := Document{
-		Version:     Version,
+		Version:     2,
 		ExportedAt:  time.Now().Format(time.RFC3339),
 		Connections: make([]Connection, 0, len(profiles)),
 	}
@@ -105,7 +106,11 @@ func Build(profiles []domain.VPNProfile, accountsOf func(profileID string) []dom
 			Port:          p.Port,
 			VendorProfile: p.VendorProfile,
 			Requires:      names[p.Requires],
+			JumpHost:      names[p.JumpHost],
 			Notes:         p.Notes,
+		}
+		if p.JumpHost != "" {
+			doc.Version = Version
 		}
 		if p.IsSSH() {
 			conn.Kind = string(domain.KindSSH)

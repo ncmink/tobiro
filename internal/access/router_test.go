@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -25,15 +26,20 @@ type rig struct {
 	refuse   map[string]error
 	log      []string
 	router   *Router
+
+	connectBlock map[string]chan struct{}
+	connectOnce  map[string]*sync.Mutex
 }
 
 func newRig(t *testing.T) *rig {
 	t.Helper()
 	r := &rig{
-		profiles: map[string]domain.VPNProfile{},
-		states:   map[string]domain.ConnectionState{},
-		accounts: map[string]string{},
-		refuse:   map[string]error{},
+		profiles:     map[string]domain.VPNProfile{},
+		states:       map[string]domain.ConnectionState{},
+		accounts:     map[string]string{},
+		refuse:       map[string]error{},
+		connectBlock: map[string]chan struct{}{},
+		connectOnce:  map[string]*sync.Mutex{},
 	}
 	r.router = NewRouter(r, r, r, mechanism{rig: r, name: "vpn"}, mechanism{rig: r, name: "ssh"})
 	return r
@@ -66,7 +72,7 @@ func (r *rig) Get(id string) (domain.VPNProfile, error) {
 func (r *rig) Dependents(id string) []domain.VPNProfile {
 	var out []domain.VPNProfile
 	for _, p := range r.profiles {
-		if p.Requires == id {
+		if p.Requires == id || p.JumpHost == id {
 			out = append(out, p)
 		}
 	}
@@ -100,8 +106,17 @@ type mechanism struct {
 	name string
 }
 
+func (m mechanism) CanDisconnect(context.Context, domain.VPNProfile) bool { return true }
+
 func (m mechanism) Connect(_ context.Context, profileID, credentialID string) (domain.VPNSession, error) {
 	r := m.rig
+	if block := r.connectBlock[profileID]; block != nil {
+		<-block
+	}
+	if mu := r.connectOnce[profileID]; mu != nil {
+		mu.Lock()
+		defer mu.Unlock()
+	}
 	if err := r.refuse[profileID]; err != nil {
 		r.log = append(r.log, fmt.Sprintf("%s refused %s", m.name, profileID))
 		r.states[profileID] = domain.StateFailed
@@ -295,6 +310,68 @@ func (c counter) RefreshAll(context.Context) { c.sweeps.Add(1) }
 // An SSH tunnel has no vendor client to read, so the background sweep is the
 // only thing that notices a dead one. It must reach both mechanisms, and keep
 // going until it is told to stop.
+func TestConcurrentChildrenShareOneParentConnect(t *testing.T) {
+	r := newRig(t)
+	r.vpn("smoi-vpn", "")
+	r.tunnel("child-a", "smoi-vpn")
+	r.tunnel("child-b", "smoi-vpn")
+
+	block := make(chan struct{})
+	r.connectBlock["smoi-vpn"] = block
+	r.connectOnce["smoi-vpn"] = &sync.Mutex{}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	errs := make(chan error, 2)
+	go func() {
+		defer wg.Done()
+		_, err := r.router.Connect(context.Background(), "child-a", "a")
+		errs <- err
+	}()
+	go func() {
+		defer wg.Done()
+		_, err := r.router.Connect(context.Background(), "child-b", "b")
+		errs <- err
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	close(block)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("connect: %v", err)
+		}
+	}
+	parentConnects := 0
+	for _, line := range r.log {
+		if strings.Contains(line, "vpn connected smoi-vpn") {
+			parentConnects++
+		}
+	}
+	if parentConnects != 1 {
+		t.Fatalf("expected one parent connect, got %d in %q", parentConnects, r.actions())
+	}
+}
+
+func TestDisconnectingThroughAnInactiveIntermediateClosesGrandchildren(t *testing.T) {
+	r := newRig(t)
+	r.vpn("root", "")
+	r.tunnel("mid", "root")
+	r.tunnel("leaf", "mid")
+	r.states["root"] = domain.StateConnected
+	r.states["mid"] = domain.StateFailed
+	r.states["leaf"] = domain.StateConnected
+
+	if _, err := r.router.Disconnect(context.Background(), "root"); err != nil {
+		t.Fatalf("disconnect: %v", err)
+	}
+	if !strings.Contains(r.actions(), "ssh disconnected leaf") {
+		t.Fatalf("expected the grandchild to be closed, got %q", r.actions())
+	}
+}
+
 func TestWatchingSweepsBothMechanismsUntilCancelled(t *testing.T) {
 	var vpnSweeps, sshSweeps atomic.Int64
 	router := NewRouter(nil, nil, nil,

@@ -39,8 +39,14 @@ type verifier struct {
 	// that raised it.
 	ctx context.Context
 
+	handshake *handshakeGuard
+
 	mu sync.Mutex
 }
+
+// SetHandshakeGuard ties host-key prompts to the dial watchdog so waiting on
+// the user does not count against the handshake budget.
+func (v *verifier) SetHandshakeGuard(g *handshakeGuard) { v.handshake = g }
 
 func newVerifier(ctx context.Context, profileID, knownHosts string, prompter Prompter, log *logging.Logger) *verifier {
 	if knownHosts == "" {
@@ -122,6 +128,11 @@ func (v *verifier) accept(hostname string, key ssh.PublicKey) error {
 	if v.prompter == nil {
 		return fmt.Errorf(
 			"%s is not in %s and there is no window to confirm it in", hostname, v.path)
+	}
+
+	if v.handshake != nil {
+		v.handshake.pause()
+		defer v.handshake.arm()
 	}
 
 	confirmed, err := v.prompter.ConfirmHostKey(v.ctx, domain.HostKeyRequest{

@@ -103,6 +103,7 @@ func (a *App) ImportConnections() (ImportResultView, error) {
 	}
 
 	a.applyRequirements(doc.Connections, byName, fresh)
+	result.Warnings = append(result.Warnings, a.applyJumpHosts(doc.Connections, byName, fresh)...)
 
 	if result.Connections > 0 {
 		a.bridge.Notify(domain.EventProfileChanged, "")
@@ -140,6 +141,9 @@ func filterProfilesForExport(profiles []domain.VPNProfile, groupHidden func(stri
 				return false
 			}
 			parentID = strings.TrimSpace(parent.Requires)
+			if parentID == "" {
+				parentID = strings.TrimSpace(parent.JumpHost)
+			}
 		}
 		return true
 	}
@@ -151,6 +155,29 @@ func filterProfilesForExport(profiles []domain.VPNProfile, groupHidden func(stri
 		}
 	}
 	return out
+}
+
+func (a *App) applyJumpHosts(connections []transfer.Connection, byName, fresh map[string]string) []string {
+	var warnings []string
+	for _, conn := range connections {
+		via := strings.TrimSpace(conn.JumpHost)
+		if via == "" {
+			continue
+		}
+		id, imported := fresh[strings.ToLower(strings.TrimSpace(conn.Name))]
+		if !imported {
+			continue
+		}
+		target, found := byName[strings.ToLower(via)]
+		if !found {
+			warnings = append(warnings, fmt.Sprintf("%q uses jump host %q, which is not in this file or on this machine", conn.Name, via))
+			continue
+		}
+		if _, err := a.profiles.SetJumpHost(id, target); err != nil {
+			warnings = append(warnings, fmt.Sprintf("could not record jump host for %q: %v", conn.Name, err))
+		}
+	}
+	return warnings
 }
 
 func (a *App) applyRequirements(connections []transfer.Connection, byName, fresh map[string]string) {
