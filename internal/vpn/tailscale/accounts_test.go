@@ -120,6 +120,41 @@ func TestResolveProfileMinkFixture(t *testing.T) {
 	}
 }
 
+// threeProfileFixture is a real switch list where one profile's nickname is
+// another profile's tailnet.
+const threeProfileFixture = `[
+  {"id":"0d3a","nickname":"ttss-ponggun2527","tailnet":"ponggun2527@gmail.com","account":"nc_minkz@hotmail.com","selected":false},
+  {"id":"068a","nickname":"ncmink","tailnet":"nc_minkz@hotmail.com","account":"nc_minkz@hotmail.com","selected":false},
+  {"id":"8ced","nickname":"nc_minkz@hotmail.com","tailnet":"nakorn_ton@hotmail.com","account":"nc_minkz@hotmail.com","selected":true}
+]`
+
+func TestResolveProfilePrefersNicknameOverAnotherTailnet(t *testing.T) {
+	accounts := parseFixture(t, threeProfileFixture)
+
+	got := resolveProfile(accounts, "nc_minkz@hotmail.com")
+	if got.Result != resolveFound || got.Account.ID != "8ced" {
+		t.Fatalf("nickname nc_minkz@hotmail.com: got %+v, want 8ced", got)
+	}
+	if opt := optionNameForAccount(accounts[2], accounts); opt != "nc_minkz@hotmail.com" {
+		t.Fatalf("form name for 8ced = %q", opt)
+	}
+	if r := resolveProfile(accounts, optionNameForAccount(accounts[2], accounts)); r.Account.ID != "8ced" {
+		t.Fatalf("form name must resolve back to its own profile, got %q", r.Account.ID)
+	}
+	if r := resolveProfile(accounts, "nakorn_ton@hotmail.com"); r.Account.ID != "8ced" {
+		t.Fatalf("tailnet nakorn_ton@hotmail.com: got %q, want 8ced", r.Account.ID)
+	}
+
+	reading := statusReading{BackendState: "Running", Identity: "nc_minkz@hotmail.com", Detail: "Tailscale is up."}
+	sw := ActiveSwitch{Accounts: accounts}
+	if st := reading.vpnStatusForProfile("nc_minkz@hotmail.com", sw); st.State != domain.StateConnected {
+		t.Fatalf("selected 8ced card: state = %s, want connected", st.State)
+	}
+	if st := reading.vpnStatusForProfile("ncmink", sw); st.State != domain.StateDisconnected {
+		t.Fatalf("ncmink card: state = %s, want disconnected", st.State)
+	}
+}
+
 func TestResolveProfileAmbiguousSharedLogin(t *testing.T) {
 	accounts := parseFixture(t, minkSwitchListFixture)
 	// Login alone is ambiguous when two profiles share nc_minkz@hotmail.com — but our

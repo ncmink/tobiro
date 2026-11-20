@@ -99,7 +99,11 @@ type resolvedProfile struct {
 }
 
 // resolveProfile maps a connection's VendorProfile to one switch list entry.
-// Order: id, tailnet, nickname, then account login only when unique.
+// Order: id, nickname, tailnet, then account login only when unique.
+//
+// Nickname comes before tailnet because that is the name the connection form
+// saves (optionNameForAccount), and a nickname may be an email that is also
+// another profile's tailnet.
 func resolveProfile(accounts []switchAccount, vendor string) resolvedProfile {
 	vendor = strings.TrimSpace(vendor)
 	if vendor == "" {
@@ -111,7 +115,7 @@ func resolveProfile(accounts []switchAccount, vendor string) resolvedProfile {
 	}
 
 	if matches := filterAccounts(accounts, func(a switchAccount) bool {
-		return strings.EqualFold(strings.TrimSpace(a.Tailnet), vendor)
+		return strings.EqualFold(strings.TrimSpace(a.Nickname), vendor)
 	}); len(matches) == 1 {
 		return resolvedProfile{Account: matches[0], Result: resolveFound}
 	} else if len(matches) > 1 {
@@ -119,7 +123,7 @@ func resolveProfile(accounts []switchAccount, vendor string) resolvedProfile {
 	}
 
 	if matches := filterAccounts(accounts, func(a switchAccount) bool {
-		return strings.EqualFold(strings.TrimSpace(a.Nickname), vendor)
+		return strings.EqualFold(strings.TrimSpace(a.Tailnet), vendor)
 	}); len(matches) == 1 {
 		return resolvedProfile{Account: matches[0], Result: resolveFound}
 	} else if len(matches) > 1 {
